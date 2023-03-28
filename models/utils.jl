@@ -4,8 +4,9 @@ Returns two vectors of length n whose ith entries denote the
 probability of being healthy and utility for the i-th
 person.
 
-If `utils` [`probs`] is a vector, entries are chosen uniformly at
-random. Otherwise, it is a probability distribution.
+If `utils` [`probs`] is a vector or a range, entries are chosen uniformly at
+random. Otherwise, it is a probability distribution, and entries are sampled
+appropriately.
 
 Utilities are rounded to the nearest integer.
 """
