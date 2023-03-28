@@ -156,24 +156,24 @@ algs = [
 # exp1_table = create_summary(exp0)
 # open("tables/exp0-summary.tex", "w") do io; show(io, "text/latex", exp0_table); end
 
-# Experiment 1: Greedy vs Non-overlapping for pilot data and G=5
-println("\nSTARTING EXPERIMENT 1: pilot data and G=5")
-G = 5
-exp1 = run_experiments(algs, [trial_population], budgets, [G])
-add_comparisons!(exp1, algs)
-CSV.write("data/exp1-data.csv", exp1)
-exp1_table = create_summary(exp1)
-open("tables/exp1-summary.tex", "w") do io; show(io, "text/latex", exp1_table); end
+# # Experiment 1: Greedy vs Non-overlapping for pilot data and G=5
+# println("\nSTARTING EXPERIMENT 1: pilot data and G=5")
+# G = 5
+# exp1 = run_experiments(algs, [trial_population], budgets, [G])
+# add_comparisons!(exp1, algs)
+# CSV.write("data/exp1-data.csv", exp1)
+# exp1_table = create_summary(exp1)
+# open("tables/exp1-summary.tex", "w") do io; show(io, "text/latex", exp1_table); end
 
 
-# Experiment 2: Greedy vs Non-overlapping for pilot data and G=10
-println("\nSTARTING EXPERIMENT 2: pilot data and G=10")
-G = 10
-exp2 = run_experiments(algs, [trial_population], budgets, [G])
-add_comparisons!(exp2, algs)
-CSV.write("data/exp2-data.csv", exp2)
-exp2_table = create_summary(exp2)
-open("tables/exp2-summary.tex", "w") do io; show(io, "text/latex", exp2_table); end
+# # Experiment 2: Greedy vs Non-overlapping for pilot data and G=10
+# println("\nSTARTING EXPERIMENT 2: pilot data and G=10")
+# G = 10
+# exp2 = run_experiments(algs, [trial_population], budgets, [G])
+# add_comparisons!(exp2, algs)
+# CSV.write("data/exp2-data.csv", exp2)
+# exp2_table = create_summary(exp2)
+# open("tables/exp2-summary.tex", "w") do io; show(io, "text/latex", exp2_table); end
 
 # SYNTHETIC EXPERIMENTS
 # Fit distribution to utilities from pilot study
