@@ -31,6 +31,7 @@ function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 
 	# Create model and set parameters
 	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV)))
+	set_optimizer_attribute(m, "Threads", 8)
 	# "Presolve" => 0, "OutputFlag" => 0, "MIPGap" => 0.01, "TimeLimit" => 600
 	!verbose && set_silent(m)
 
