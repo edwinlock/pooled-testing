@@ -1,8 +1,8 @@
 # Install all packages that aren't yet installed
-using Pkg
-Pkg.add([
-    "CSV", "DataFrames", "Statistics", "Dates", "StatsPlots",
-    "Distributions", "ProgressBars", "DataStructures", "Gurobi"])
+# using Pkg
+# Pkg.add([
+#     "CSV", "DataFrames", "Statistics", "Dates", "StatsPlots",
+#     "Distributions", "ProgressBars", "DataStructures", "Gurobi"])
 
 # Load packages
 using CSV, DataFrames, Statistics, Dates, StatsPlots, Distributions, ProgressBars, DataStructures, Gurobi
