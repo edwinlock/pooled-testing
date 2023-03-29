@@ -9,10 +9,12 @@
 
     wget https://julialang-s3.julialang.org/bin/linux/x64/1.8/julia-1.8.5-linux-x86_64.tar.gz
     tar zxvf julia-1.8.5-linux-x86_64.tar.gz
+
 **Gurobi**
 
     wget https://packages.gurobi.com/10.0/gurobi10.0.1_armlinux64.tar.gz
     tar zxvf gurobi10.0.1_armlinux64.tar.gz
+
 **MOSEK**
 
     wget https://download.mosek.com/stable/10.0.40/mosektoolslinuxaarch64.tar.bz2
