@@ -183,11 +183,11 @@ utility_distribution = fit(Normal, baseline_utilities)
 # density!(baseline_utilities, linecolor=:black)
 # utility_pdf(x) = Distributions.pdf(utility_distribution, x)
 # plot!(utility_pdf, linecolor=:blue, linestyle=:dash)
-n = 150  # population size 
+n = 200  # population size 
 health_probs = Uniform(0.5,1)  # range of health probabilities to draw from
 reps = 20  # number of populations to generate
 populations = [generate_instance(n, health_probs, utility_distribution) for _ in 1:reps]
-budgets = [2, 4, 6, 8, 10]
+budgets = [2, 4, 6, 8, 10, 12]
 
 # Experiment 3: Greedy vs Non-overlapping with n=150, G=5
 println("\nSTARTING EXPERIMENT 3")
