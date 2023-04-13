@@ -234,20 +234,20 @@ algs = [
 
 ## SECTION: TOWARDS OVERLAPPING TESTING
 
-# Experiment 6: Non-overlapping vs 2-Overlapping with n=10, G=3
-println("\nSTARTING EXPERIMENT 6")
-n = 10
-reps = 20
-small_populations = [generate_instance(n, 0:0.1:1, 1:3) for _ in 1:reps]
-budgets = [2,3,4,5]
-G = n
-algs = [
-    (name=:disjoint, fn=exact, args=Dict(:k => 1)),
-    (name=:two_overlap, fn=exact, args=Dict(:k => 2))
-]
-exp6 = run_experiments(algs, small_populations, budgets, [G])
-add_comparisons!(exp6, [algs[2], algs[1]])
-CSV.write("data/exp6-data.csv", exp6)
+# # Experiment 6: Non-overlapping vs 2-Overlapping with n=10, G=3
+# println("\nSTARTING EXPERIMENT 6")
+# n = 10
+# reps = 20
+# small_populations = [generate_instance(n, 0:0.1:1, 1:3) for _ in 1:reps]
+# budgets = [2,3,4,5]
+# G = n
+# algs = [
+#     (name=:disjoint, fn=exact, args=Dict(:k => 1)),
+#     (name=:two_overlap, fn=exact, args=Dict(:k => 2))
+# ]
+# exp6 = run_experiments(algs, small_populations, budgets, [G])
+# add_comparisons!(exp6, [algs[2], algs[1]])
+# CSV.write("data/exp6-data.csv", exp6)
 
 # Plot welfares for Experiment 6
 @df exp6 violin(
@@ -282,16 +282,16 @@ Plots.pdf("figs/exp6-welfares.pdf")
 @df exp6 dotplot!(:budget, :ratio, marker=(:black,stroke(0)), label="")
 Plots.pdf("figs/exp6-ratios.pdf")
 
-# Create summary table for Experiment 6
-output = combine(
-    groupby(exp6, :budget),
-    :disjoint_welfare => mean,
-    :disjoint_time => roundmean => "disjoint time",
-    :two_overlap_welfare => mean,
-    :two_overlap_time => roundmean => "2-overlap time",
-)
-open("tables/exp6-summary.tex", "w") do io; show(io, "text/latex", output); end
+# # Create summary table for Experiment 6
+# output = combine(
+#     groupby(exp6, :budget),
+#     :disjoint_welfare => mean,
+#     :disjoint_time => roundmean => "disjoint time",
+#     :two_overlap_welfare => mean,
+#     :two_overlap_time => roundmean => "2-overlap time",
+# )
+# open("tables/exp6-summary.tex", "w") do io; show(io, "text/latex", output); end
 
-# End Experiment 6
+# # End Experiment 6
 
 ## END EXPERIMENTS

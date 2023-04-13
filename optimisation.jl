@@ -38,6 +38,8 @@ function exact(population::Population; k=1, T, G, verbose=false)
     q, u, keylist = pop2vec(pop)  # Get input vectors for model
     if T==1 && k==1
         m, x = single_mosek(q, u; G=G, verbose=verbose)
+    elseif k==1
+        m, x = milp_disjoint_model(q, u; T=T, G=G, verbose=verbose)
     else
         m, x = milp_overlap_model(q, u; k=k, T=T, G=G, verbose=verbose)
     end
