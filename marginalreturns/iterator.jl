@@ -42,3 +42,12 @@ function _iterate_state(iter::LexiIter, state::Tuple)
     for k in i:iter.rep; next_state[k] = res; end
     return tuple(next_state...)
 end
+
+import Base.length
+function length(iter::LexiIter)
+    s = 0
+    for l in iter
+        s += 1
+    end
+    return s
+end

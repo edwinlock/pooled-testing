@@ -19,14 +19,12 @@ function opt_welfare(q, u, allocations)
 end
 
 
-function search(n::Int, probabilities::Array{Float64}, utilities::Array{Int})
+function search(n::Int, probabilities, utilities)
     allocations = [all_allocations(n, B) for B in 1:3]  # compute all possible allocations
     w = [0.0, 0.0, 0.0]  # pre-allocate vector for storing welfares for budgets 1, 2, 3
     max_diff, max_q, max_u = -1, fill(1.0,n), fill(1,n)
     for q ∈ ProgressBar(LexiIter(probabilities,n))
         for u ∈ LexiIter(utilities,n)
-            println(q)
-            println(u)
             for B in 1:3; w[B] = opt_welfare(q, u, allocations[B]); end
             diff = w[1] - 2*w[2] + w[3]
             if diff > max_diff + 1e-10
@@ -76,11 +74,7 @@ end
 
 probabilities = 0.1:0.1:1.0
 utilities = 1:10
-n = 4
-@time search(n, probabilities, utilities)
+n = 6
+search(n, probabilities, utilities)
+
 @time multithreaded(n, probabilities, utilities)
-
-
-for l in LexiIter(probabilities,4)
-    println(l)
-end
