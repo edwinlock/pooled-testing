@@ -1,5 +1,7 @@
 using Combinatorics, ProgressBars
 
+include("iterator.jl")
+
 """Compute all disjoint allocations for population size n and B tests."""
 all_allocations(n, B) = [c for partitions in [collect(partitions(s, B)) for subset in [collect(combinations(1:n, k)) for k in B:n] for s in subset] for c in partitions]
 
@@ -21,8 +23,10 @@ function search(n::Int, probabilities::Array{Float64}, utilities::Array{Int})
     allocations = [all_allocations(n, B) for B in 1:3]  # compute all possible allocations
     w = [0.0, 0.0, 0.0]  # pre-allocate vector for storing welfares for budgets 1, 2, 3
     max_diff, max_q, max_u = -1, fill(1.0,n), fill(1,n)
-    for q ∈ ProgressBar(Base.product(ntuple(i->probabilities, n)...))
-        for u ∈ Base.product(ntuple(i->utilities, n)...)
+    for q ∈ ProgressBar(LexiIter(probabilities,n))
+        for u ∈ LexiIter(utilities,n)
+            println(q)
+            println(u)
             for B in 1:3; w[B] = opt_welfare(q, u, allocations[B]); end
             diff = w[1] - 2*w[2] + w[3]
             if diff > max_diff + 1e-10
@@ -70,30 +74,13 @@ function multithreaded(n::Int, probabilities::Array{Float64}, utilities::Array{I
     return max_diffs[i], max_sols[i]
 end
 
-probabilities = collect(0.1:0.1:1.0)
-utilities = collect(1:10)
-n = 5
+probabilities = 0.1:0.1:1.0
+utilities = 1:10
+n = 4
 @time search(n, probabilities, utilities)
 @time multithreaded(n, probabilities, utilities)
 
 
-
-function _iterate(state::Vector{Int}, max_vals)
-    state = copy(state)
-    state[end] += 1
-    i = length(state)
-    while i > 1 && state[i] > max_vals[i]  # carry over!
-        state[i-1] += 1
-        i -= 1
-    end
-    state[1] > max_val[1] && return nothing
-    state[i+1:end] .= state[i]
-    return state
-end
-
-
-function iterate(iters...)
-    state = fill(1, length(iters))
-    item = (iters[i][state[i]] for i in eachindex(iters))
-    return item, state
+for l in LexiIter(probabilities,4)
+    println(l)
 end
