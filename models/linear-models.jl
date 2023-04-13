@@ -52,7 +52,7 @@ function milp_overlap_model(q, u; k, T, G=5, verbose=false)
 	# set_optimizer_attribute(m, "TimeLimit", 600)
 	# set_optimizer_attribute(m, "Presolve", -1)
     # set_optimizer_attribute(m, "MIPGap", 0.01)
-    
+
 	@variable(m, x[tests, people], Bin)
 	@variable(m, con[psets, people], Bin)
 	@variable(m, dis[psets, people], Bin)

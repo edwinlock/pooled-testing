@@ -156,7 +156,7 @@ algs = [
 # exp1_table = create_summary(exp0)
 # open("tables/exp0-summary.tex", "w") do io; show(io, "text/latex", exp0_table); end
 
-# # Experiment 1: Greedy vs Non-overlapping for pilot data and G=5
+# Experiment 1: Greedy vs Non-overlapping for pilot data and G=5
 # println("\nSTARTING EXPERIMENT 1: pilot data and G=5")
 # G = 5
 # exp1 = run_experiments(algs, [trial_population], budgets, [G])
@@ -175,71 +175,71 @@ algs = [
 # exp2_table = create_summary(exp2)
 # open("tables/exp2-summary.tex", "w") do io; show(io, "text/latex", exp2_table); end
 
-# SYNTHETIC EXPERIMENTS
-# Fit distribution to utilities from pilot study
-utility_distribution = fit(Normal, baseline_utilities)
-# Verify that the distribution is a good fit:
-# histogram(baseline_utilities, normalize=true, bins=20, fill=:lightgray, fillalpha=0.3, legend=false)
-# density!(baseline_utilities, linecolor=:black)
-# utility_pdf(x) = Distributions.pdf(utility_distribution, x)
-# plot!(utility_pdf, linecolor=:blue, linestyle=:dash)
-n = 150  # population size 
-health_probs = Uniform(0.5,1)  # range of health probabilities to draw from
-reps = 20  # number of populations to generate
-populations = [generate_instance(n, health_probs, utility_distribution) for _ in 1:reps]
-budgets = [2, 4, 6, 8, 10]
+# # SYNTHETIC EXPERIMENTS
+# # Fit distribution to utilities from pilot study
+# utility_distribution = fit(Normal, baseline_utilities)
+# # Verify that the distribution is a good fit:
+# # histogram(baseline_utilities, normalize=true, bins=20, fill=:lightgray, fillalpha=0.3, legend=false)
+# # density!(baseline_utilities, linecolor=:black)
+# # utility_pdf(x) = Distributions.pdf(utility_distribution, x)
+# # plot!(utility_pdf, linecolor=:blue, linestyle=:dash)
+# n = 200  # population size 
+# health_probs = Uniform(0.5,1)  # range of health probabilities to draw from
+# reps = 20  # number of populations to generate
+# populations = [generate_instance(n, health_probs, utility_distribution) for _ in 1:reps]
+# budgets = [2, 4, 6, 8, 10, 12]
 
-# Experiment 3: Greedy vs Non-overlapping with n=150, G=5
-println("\nSTARTING EXPERIMENT 3")
-G = 5
-algs = [
-    (name=:approx, fn=approximate, args=Dict(:K => 20)),
-    (name=:greedy, fn=greedy, args=Dict())
-]
-exp3 = run_experiments(algs, populations, budgets, [G])
-add_comparisons!(exp3, algs)
-CSV.write("data/exp3-data.csv", exp3)
-plot_welfares(exp3, "figs/exp3-welfares.pdf")
-plot_ratios(exp3, "figs/exp3-ratios.pdf")
-exp3_table = create_summary(exp3)
-open("tables/exp3-summary.tex", "w") do io; show(io, "text/latex", exp3_table); end
+# # Experiment 3: Greedy vs Non-overlapping with population size n and G=5
+# println("\nSTARTING EXPERIMENT 3")
+# G = 5
+# algs = [
+#     (name=:approx, fn=approximate, args=Dict(:K => 20)),
+#     (name=:greedy, fn=greedy, args=Dict())
+# ]
+# exp3 = run_experiments(algs, populations, budgets, [G])
+# add_comparisons!(exp3, algs)
+# CSV.write("data/exp3-data.csv", exp3)
+# plot_welfares(exp3, "figs/exp3-welfares.pdf")
+# plot_ratios(exp3, "figs/exp3-ratios.pdf")
+# exp3_table = create_summary(exp3)
+# open("tables/exp3-summary.tex", "w") do io; show(io, "text/latex", exp3_table); end
 
-# Experiment 4: Greedy vs Non-overlapping with n=250, G=10
-println("\nSTARTING EXPERIMENT 4")
-G = 10
-algs = [
-    (name=:approx, fn=approximate, args=Dict(:K =>20)),
-    (name=:greedy, fn=greedy, args=Dict())
-]
-exp4 = run_experiments(algs, populations, budgets, [G])
-add_comparisons!(exp4, algs)
-CSV.write("data/exp4-data.csv", exp4)
-plot_welfares(exp4, "figs/exp4-welfares.pdf")
-plot_ratios(exp4, "figs/exp4-ratios.pdf")
-exp4_table = create_summary(exp4)
-open("tables/exp4-summary.tex", "w") do io; show(io, "text/latex", exp4_table); end
-
-
-# # Experiment 5: Greedy vs Non-overlapping with n=150, G=150
-# println("\nSTARTING EXPERIMENT 5")
-# G = 150
-# algs = [(name=:approx, fn=approximate, args=Dict(:K =>10)), (name=:greedy, fn=greedy, args=Dict())]
-# exp5 = run_experiments(algs, populations, budgets, [G])
-# add_comparisons!(exp5, algs)
-# CSV.write("data/experiment5-$(Dates.now()).csv", exp5)
-# plot_welfares(exp5, n=n, G=G)
-# plot_ratios(exp5, n=n, G=G)
-# exp5_table = create_summary(exp5, n=n, G=G)
+# # Experiment 4: Greedy vs Non-overlapping with population size n and G=10
+# println("\nSTARTING EXPERIMENT 4")
+# G = 10
+# algs = [
+#     (name=:approx, fn=approximate, args=Dict(:K =>20)),
+#     (name=:greedy, fn=greedy, args=Dict())
+# ]
+# exp4 = run_experiments(algs, populations, budgets, [G])
+# add_comparisons!(exp4, algs)
+# CSV.write("data/exp4-data.csv", exp4)
+# plot_welfares(exp4, "figs/exp4-welfares.pdf")
+# plot_ratios(exp4, "figs/exp4-ratios.pdf")
+# exp4_table = create_summary(exp4)
+# open("tables/exp4-summary.tex", "w") do io; show(io, "text/latex", exp4_table); end
 
 
-# ## SECTION: TOWARDS OVERLAPPING TESTING
+# # # Experiment 5: Greedy vs Non-overlapping with n=150, G=150
+# # println("\nSTARTING EXPERIMENT 5")
+# # G = 150
+# # algs = [(name=:approx, fn=approximate, args=Dict(:K =>10)), (name=:greedy, fn=greedy, args=Dict())]
+# # exp5 = run_experiments(algs, populations, budgets, [G])
+# # add_comparisons!(exp5, algs)
+# # CSV.write("data/experiment5-$(Dates.now()).csv", exp5)
+# # plot_welfares(exp5, n=n, G=G)
+# # plot_ratios(exp5, n=n, G=G)
+# # exp5_table = create_summary(exp5, n=n, G=G)
+
+
+## SECTION: TOWARDS OVERLAPPING TESTING
 
 # # Experiment 6: Non-overlapping vs 2-Overlapping with n=10, G=3
 # println("\nSTARTING EXPERIMENT 6")
 # n = 10
 # reps = 20
 # small_populations = [generate_instance(n, 0:0.1:1, 1:3) for _ in 1:reps]
-# budgets = [2,3,4]
+# budgets = [2,3,4,5]
 # G = n
 # algs = [
 #     (name=:disjoint, fn=exact, args=Dict(:k => 1)),
@@ -249,38 +249,38 @@ open("tables/exp4-summary.tex", "w") do io; show(io, "text/latex", exp4_table); 
 # add_comparisons!(exp6, [algs[2], algs[1]])
 # CSV.write("data/exp6-data.csv", exp6)
 
-# # Plot welfares for Experiment 6
-# @df exp6 violin(
-#     :budget,
-#     :disjoint_welfare,
-#     side=:left,
-#     linewidth=0,
-#     label="Disjoint",
-#     legend=false,
-#     xticks=budgets,
-#     xlabel="Test budget",
-#     ylabel="Welfare",
-#     # ylims=ylims,
-#     size=(400,300))
-# @df exp6 dotplot!(:budget, :disjoint_welfare, side=:left, marker=(:black,stroke(0)), label="")
-# @df exp6 violin!(:budget, :two_overlap_welfare, side=:right, linewidth=0, label="2-Overlap")
-# @df exp6 dotplot!(:budget, :two_overlap_welfare, side=:right, marker=(:black,stroke(0)), label="")
-# Plots.pdf("figs/exp6-welfares.pdf")
+# Plot welfares for Experiment 6
+@df exp6 violin(
+    :budget,
+    :disjoint_welfare,
+    side=:left,
+    linewidth=0,
+    label="Disjoint",
+    legend=false,
+    xticks=budgets,
+    xlabel="Test budget",
+    ylabel="Welfare",
+    # ylims=ylims,
+    size=(400,300))
+@df exp6 dotplot!(:budget, :disjoint_welfare, side=:left, marker=(:black,stroke(0)), label="")
+@df exp6 violin!(:budget, :two_overlap_welfare, side=:right, linewidth=0, label="2-Overlap")
+@df exp6 dotplot!(:budget, :two_overlap_welfare, side=:right, marker=(:black,stroke(0)), label="")
+Plots.pdf("figs/exp6-welfares.pdf")
 
-# # Plot ratios for Experiment 6
-# @df exp6 violin(
-#     :budget,
-#     :ratio,
-#     linewidth=0,
-#     label="",
-#     legend=false,
-#     xlabel="Test budget",
-#     ylabel="Welfare ratio",
-#     xticks=budgets,
-#     # ylims=ylims,
-#     size=(400,300))
-# @df exp6 dotplot!(:budget, :ratio, marker=(:black,stroke(0)), label="")
-# Plots.pdf("figs/exp6-ratios.pdf")
+# Plot ratios for Experiment 6
+@df exp6 violin(
+    :budget,
+    :ratio,
+    linewidth=0,
+    label="",
+    legend=false,
+    xlabel="Test budget",
+    ylabel="Welfare ratio",
+    xticks=budgets,
+    # ylims=ylims,
+    size=(400,300))
+@df exp6 dotplot!(:budget, :ratio, marker=(:black,stroke(0)), label="")
+Plots.pdf("figs/exp6-ratios.pdf")
 
 # # Create summary table for Experiment 6
 # output = combine(
