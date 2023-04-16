@@ -7,12 +7,14 @@ TODO:
 * Implement any other optional methods?
 """
 
+import Base.iterate, Base.eltype, Base.length
+
 struct LexiIter
     inner  # the 'inner' iterator that is repeated
     rep::Int  # the number of repetitions
 end
 
-import Base.iterate
+# eltype(LexiIter) = Tuple{Int}
 
 function iterate(iter::LexiIter)
     res = iterate(iter.inner)
@@ -43,7 +45,6 @@ function _iterate_state(iter::LexiIter, state::Tuple)
     return tuple(next_state...)
 end
 
-import Base.length
 function length(iter::LexiIter)
     s = 0
     for l in iter
