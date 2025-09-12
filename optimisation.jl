@@ -1,5 +1,3 @@
-using Pkg
-Pkg.add(["JuMP", "Gurobi", "DataStructures", "Roots", "Combinatorics", "MosekTools", "MathOptInterface"])
 using JuMP, Gurobi, DataStructures
 
 # Define constants
@@ -27,7 +25,6 @@ function greedy(population::Population; T, G=5, verbose=false)
     end
     w = welfare(pools, population)
     return w, pools, 0.
-    # return sum(welfares; init=0), pools, 0.
 end
 
 
@@ -50,7 +47,9 @@ function exact(population::Population; k=1, T, G, verbose=false)
     return w, pools, 0.
 end
 
+
 conic(pop::Population; G=5, verbose=false) = exact(pop, T=1, G=G, verbose=verbose)
+
 
 function approximate(population::Population; T, G=5, K=15, verbose=false)
     pop = copy(population)  # makes defensive copy
