@@ -18,6 +18,11 @@ function single_mosek(q, u; G, verbose=false)
 
 	# Create model and set parameters
 	m = Model(Mosek.Optimizer)
+	# Force MOSEK to a single internal thread. The outer experiment loop already
+	# parallelises across solves; letting MOSEK spin up its own (TBB) thread pool
+	# from within a Julia worker thread triggers a TBB init crash on many-core
+	# machines. One thread per solve avoids that and is best for these small MICPs.
+	set_optimizer_attribute(m, "MSK_IPAR_NUM_THREADS", 1)
 	!verbose && set_silent(m)
 
 	# Define variables

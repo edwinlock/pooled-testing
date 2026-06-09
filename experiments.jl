@@ -56,24 +56,24 @@ function run_experiments(algs, populations, budgets, poolsizes; multithread=fals
     work = [(i, pop, T, G)
             for (i, pop) in enumerate(populations) for T in budgets for G in poolsizes]
     results = Vector{Dict{Symbol, Any}}(undef, length(work))
-    progress = Progress(length(work); desc="Running experiments...")  # ProgressMeter is thread-safe
-    # Cell coordinates shown below the bar (budget, pool size, population).
-    cellvalues(i, T, G) = [(:budget, T), (:poolsize, G), (:population, i)]
+    progress = Progress(length(work); desc="Running experiments ")  # ProgressMeter is thread-safe
+    # Current cell shown inline in the bar's description (budget, pool size).
+    celldesc(T, G) = "Running G=$(G), B=$(T) "
     if multithread
         # Each thread writes its own index, so no synchronisation is needed.
         Threads.@threads for k in eachindex(work)
             i, pop, T, G = work[k]
             results[k] = run_cell(algs, i, pop, T, G)
-            next!(progress; showvalues=cellvalues(i, T, G))
+            next!(progress; desc=celldesc(T, G))
         end
     else
         for k in eachindex(work)
             i, pop, T, G = work[k]
-            # Show the cell about to run, so a long solve displays its own
-            # budget/G while it churns rather than the previous cell's.
-            update!(progress; showvalues=cellvalues(i, T, G))
+            # Update the description to the cell about to run, so a long solve
+            # shows its own budget/G in the bar while it churns.
+            update!(progress; desc=celldesc(T, G))
             results[k] = run_cell(algs, i, pop, T, G)
-            next!(progress; showvalues=cellvalues(i, T, G))
+            next!(progress; desc=celldesc(T, G))
         end
     end
     # Assemble the DataFrame serially (DataFrame push! is not thread-safe).
