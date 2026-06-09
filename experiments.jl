@@ -265,7 +265,10 @@ end
 
 """
 Run an approx-vs-greedy experiment on `reps` synthetic populations of size `n`
-(experiments 3–4). Solves run multithreaded and welfare/ratio plots are written.
+(experiments 3–4). Run single-threaded: these use greedy's MOSEK conic
+subroutine, and MOSEK's Linux aarch64 build aborts when called from a Julia
+worker thread (it only runs safely on the main thread). Welfare/ratio plots are
+written.
 """
 function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
     println("\nSTARTING EXPERIMENT $(num): $(desc)")
@@ -273,7 +276,7 @@ function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
     ensure_dirs(rootdir)
     populations = synthetic_populations(rootdir, n, reps)
     algs = approx_vs_greedy(K)
-    df = run_experiments(algs, populations, SYNTHETIC_BUDGETS, [G]; multithread=true)
+    df = run_experiments(algs, populations, SYNTHETIC_BUDGETS, [G])
     add_comparisons!(df, algs)
     save_results(df, num, rootdir)
     plot_welfares(df, joinpath(rootdir, "figs", "exp$(num)-welfares.pdf"))
