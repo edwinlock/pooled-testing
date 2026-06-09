@@ -22,13 +22,15 @@ All commands below use the Ohio region (`us-east-2`, typically the cheapest).
 These give the instance somewhere to store results and permission to do so. Set
 them up **once**; they are account-level resources that survive terminations.
 
-**1. Create the S3 bucket.** Bucket names are globally unique, so pick something
-like `edwinlock-pooled-testing`. Outside `us-east-1` the `LocationConstraint` is
-required. This name replaces `YOUR_BUCKET` everywhere below.
+**1. Create the S3 bucket.** The commands below use `pooled-testing-bucket`.
+Bucket names are globally unique across all AWS accounts, so if that one is
+already taken (`BucketAlreadyExists`), pick a more specific name such as
+`edwinlock-pooled-testing` and substitute it everywhere below. Outside
+`us-east-1` the `LocationConstraint` is required.
 
 ```sh
 aws s3api create-bucket \
-  --bucket YOUR_BUCKET \
+  --bucket pooled-testing-bucket \
   --region us-east-2 \
   --create-bucket-configuration LocationConstraint=us-east-2
 ```
@@ -44,8 +46,8 @@ trusted entity *AWS service* → *EC2*, then attach a policy with:
     "Effect": "Allow",
     "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
     "Resource": [
-      "arn:aws:s3:::YOUR_BUCKET",
-      "arn:aws:s3:::YOUR_BUCKET/*"
+      "arn:aws:s3:::pooled-testing-bucket",
+      "arn:aws:s3:::pooled-testing-bucket/*"
     ]
   }]
 }
@@ -109,7 +111,7 @@ completed experiments are recognised and skipped:
 
 ```sh
 cd pooled-testing
-for d in data tables figs; do aws s3 sync s3://YOUR_BUCKET/pooled-testing/$d $d; done
+for d in data tables figs; do aws s3 sync s3://pooled-testing-bucket/pooled-testing/$d $d; done
 ```
 
 While experiments run, sync the outputs **up** periodically so a 2-minute
@@ -119,7 +121,7 @@ separate tmux window (`Ctrl-b c`):
 ```sh
 cd pooled-testing
 while true; do
-  for d in data tables figs; do aws s3 sync $d s3://YOUR_BUCKET/pooled-testing/$d; done
+  for d in data tables figs; do aws s3 sync $d s3://pooled-testing-bucket/pooled-testing/$d; done
   sleep 600   # every 10 minutes
 done
 ```
