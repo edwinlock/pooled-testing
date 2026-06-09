@@ -35,11 +35,27 @@ aws s3api create-bucket \
   --create-bucket-configuration LocationConstraint=us-east-2
 ```
 
-**2. Create an IAM role for EC2**, scoped to just this bucket (preferred over
-the broad `AmazonS3FullAccess`). In the console: IAM → Roles → Create role →
-trusted entity *AWS service* → *EC2*, then attach a policy with:
+**2. Create an IAM role and instance profile for EC2**, scoped to just this
+bucket (preferred over the broad `AmazonS3FullAccess`). The CLI is the most
+reliable way — with the CLI the role, its permission policy, and the *instance
+profile* (the container EC2 actually attaches) are separate objects, so there
+are several commands. Run them in order:
 
-```json
+```sh
+# (a) Trust policy — lets EC2 assume the role. Write it to a file.
+cat > trust-policy.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "ec2.amazonaws.com"},
+    "Action": "sts:AssumeRole"
+  }]
+}
+EOF
+
+# (b) Permission policy — what the role may do (S3 access to the bucket).
+cat > s3-policy.json <<'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [{
@@ -51,11 +67,28 @@ trusted entity *AWS service* → *EC2*, then attach a policy with:
     ]
   }]
 }
+EOF
+
+# (c) Create the role with the trust policy.
+aws iam create-role --role-name pooled-testing-s3 \
+  --assume-role-policy-document file://trust-policy.json
+
+# (d) Attach the S3 permission policy to the role (this is where the JSON goes).
+aws iam put-role-policy --role-name pooled-testing-s3 \
+  --policy-name s3-access --policy-document file://s3-policy.json
+
+# (e) Create the instance profile and add the role to it. The instance profile
+#     name (pooled-testing-s3) is what the launch command references.
+aws iam create-instance-profile --instance-profile-name pooled-testing-s3
+aws iam add-role-to-instance-profile \
+  --instance-profile-name pooled-testing-s3 --role-name pooled-testing-s3
 ```
 
-Name the role `pooled-testing-s3` (matching the launch command below). The role
-gives the instance temporary, auto-rotating credentials — no keys stored on the
-disposable Spot box.
+IAM is global, so these commands need no `--region`. (In the console the
+equivalent is fiddlier: you must first create the *policy* under IAM → Policies
+→ Create policy → JSON tab — paste the permission policy from (b) — then create
+the role under IAM → Roles and attach that policy. The console creates the
+matching instance profile for you automatically.)
 
 ### Launching the instance
 
