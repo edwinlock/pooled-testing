@@ -57,16 +57,23 @@ function run_experiments(algs, populations, budgets, poolsizes; multithread=fals
             for (i, pop) in enumerate(populations) for T in budgets for G in poolsizes]
     results = Vector{Dict{Symbol, Any}}(undef, length(work))
     progress = Progress(length(work); desc="Running experiments...")  # ProgressMeter is thread-safe
+    # Cell coordinates shown below the bar (budget, pool size, population).
+    cellvalues(i, T, G) = [(:budget, T), (:poolsize, G), (:population, i)]
     if multithread
         # Each thread writes its own index, so no synchronisation is needed.
         Threads.@threads for k in eachindex(work)
-            results[k] = run_cell(algs, work[k]...)
-            next!(progress)
+            i, pop, T, G = work[k]
+            results[k] = run_cell(algs, i, pop, T, G)
+            next!(progress; showvalues=cellvalues(i, T, G))
         end
     else
         for k in eachindex(work)
-            results[k] = run_cell(algs, work[k]...)
-            next!(progress)
+            i, pop, T, G = work[k]
+            # Show the cell about to run, so a long solve displays its own
+            # budget/G while it churns rather than the previous cell's.
+            update!(progress; showvalues=cellvalues(i, T, G))
+            results[k] = run_cell(algs, i, pop, T, G)
+            next!(progress; showvalues=cellvalues(i, T, G))
         end
     end
     # Assemble the DataFrame serially (DataFrame push! is not thread-safe).
@@ -203,7 +210,7 @@ end
 ## GLOBAL PARAMETERS
 
 const UTIL_UPPER_BOUND = 50
-const PILOT_BUDGETS = collect(2:4:34)      # {2, 6, ..., 34} for the pilot experiments
+const PILOT_BUDGETS = collect(2:4:30)      # {2, 6, ..., 30} for the pilot experiments
 const SYNTHETIC_BUDGETS = collect(2:2:12)  # {2, 4, ..., 12} for the synthetic experiments
 
 
