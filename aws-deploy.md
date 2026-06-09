@@ -4,7 +4,7 @@
 `c8g.24xlarge` (96 vCPUs) or `c8g.16xlarge` (64 vCPUs). These match the ARM
 Julia/Gurobi/MOSEK builds downloaded below. Pick the size to fit the parallel
 experiments: experiments 3–5 run their independent solves across Julia threads,
-so launch Julia with `-t auto` (see step 3) to use all the cores. `c8g.48xlarge`
+so launch Julia with `-t auto` (see step 4) to use all the cores. `c8g.48xlarge`
 (192 vCPUs) is the largest, but is only worth it if you saturate it.
 
 ## Launching on a Spot Instance (cheaper)
@@ -155,40 +155,12 @@ aws ec2 describe-spot-price-history --region us-east-2 \
 
 Then connect and set up the instance via the numbered steps below.
 
-### Persisting results to S3
-
-So results survive a termination, sync the output directories `data/`, `tables/`
-and `figs/` to the bucket. The repository itself is not persisted (it is cloned
-from git); `data/` is what the resume logic reads, `tables/` and `figs/` are the
-paper outputs.
-
-On a **fresh instance**, sync any earlier results down *before* running, so
-completed experiments are recognised and skipped:
-
-```sh
-cd pooled-testing
-for d in data tables figs; do aws s3 sync s3://pooled-testing-bucket/pooled-testing/$d $d; done
-```
-
-While experiments run, sync the outputs **up** periodically so a 2-minute
-spot-termination warning never costs more than one interval. Run this in a
-separate tmux window (`Ctrl-b c`):
-
-```sh
-cd pooled-testing
-while true; do
-  for d in data tables figs; do aws s3 sync $d s3://pooled-testing-bucket/pooled-testing/$d; done
-  sleep 600   # every 10 minutes
-done
-```
-
-Only *completed* experiments are recoverable — an experiment interrupted
-mid-solve has no CSV yet and re-runs from scratch, so this loses at most the
-in-progress experiment regardless of sync interval.
-
-After an interruption, relaunch (the IAM role is set at launch above), sync the
-results down, and re-run the same command — completed experiments are skipped
-automatically.
+Results are persisted to S3 (steps 3 and 5 below) so they survive a termination:
+the output directories `data/`, `tables/` and `figs/` are synced to the bucket.
+The repository itself is not persisted (it is cloned from git); `data/` is what
+the resume logic reads, `tables/` and `figs/` are the paper outputs. On-demand
+instances are not reclaimed, so syncing is optional there but still guards
+against accidental termination or a crash.
 
 ## 1. Connect and copy over the licence files
 
@@ -225,7 +197,18 @@ source ~/.bashrc   # load the environment into the current shell
 To upgrade the Julia/Gurobi/MOSEK versions, edit the version variables at the
 top of `setup.sh`.
 
-## 3. Run experiments inside `tmux`
+## 3. Sync any earlier results down from S3
+
+On a fresh instance, pull down results from previous runs *before* running, so
+completed experiments are recognised and skipped (skip this on the very first
+run, when the bucket is empty):
+
+```sh
+cd pooled-testing
+for d in data tables figs; do aws s3 sync s3://pooled-testing-bucket/pooled-testing/$d $d; done
+```
+
+## 4. Run experiments inside `tmux`
 
 Running inside `tmux` keeps the experiments alive if your SSH connection drops —
 otherwise the run is tied to your SSH session and is killed on disconnect
@@ -258,6 +241,26 @@ julia --project=. -t auto experiments.jl --experiments 1,3,5
 
 Detach with `Ctrl-b` then `d` (the run keeps going); you can now disconnect SSH.
 Reattach later with `tmux attach -t experiments`, or list sessions with `tmux ls`.
+
+## 5. Sync results back up to S3
+
+While the experiments run, sync the outputs **up** periodically so an
+interruption never costs more than one interval. Run this in a separate tmux
+window (`Ctrl-b c`):
+
+```sh
+cd pooled-testing
+while true; do
+  for d in data tables figs; do aws s3 sync $d s3://pooled-testing-bucket/pooled-testing/$d; done
+  sleep 600   # every 10 minutes
+done
+```
+
+Only *completed* experiments are recoverable — an experiment interrupted
+mid-solve has no CSV yet and re-runs from scratch, so this loses at most the
+in-progress experiment regardless of sync interval. After an interruption,
+relaunch, repeat from step 1 (the sync-down in step 3 restores finished
+experiments), and re-run — completed experiments are skipped automatically.
 
 ### Monitoring CPU usage with `htop`
 
