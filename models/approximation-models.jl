@@ -30,7 +30,7 @@ function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 	A, B = minimum(log.(u)) + G*minimum(log.(q)), log(G*maximum(u)) + maximum(log.(q))
 
 	# Create model and set parameters
-	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV)))
+	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(grb_env())))
 	# set_optimizer_attribute(m, "Threads", 8)
 	# "Presolve" => 0, "OutputFlag" => 0, "MIPGap" => 0.01, "TimeLimit" => 600
 	!verbose && set_silent(m)
@@ -219,7 +219,7 @@ function approx_model(q, u; k=1, T, G=5, K=15, verbose=false)
 	# println("A: $(A), B:$(B)")
 
 	# Create model and set parameters
-	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(GRB_ENV)))
+	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(grb_env())))
 	# set_optimizer_attribute(m, "Threads", 8)
 	# "Presolve" => 0, "OutputFlag" => 0, "MIPGap" => 0.01, "TimeLimit" => 600
 	!verbose && set_silent(m)

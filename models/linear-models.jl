@@ -5,7 +5,7 @@ function milp_disjoint_model(q, u; T, G=5, verbose=false)
 	people = 1:n
 	M = G * maximum(u) + 1  # Compute big M bound for `implication constraints`
 
-	m = Model(() -> Gurobi.Optimizer(GRB_ENV))
+	m = Model(() -> Gurobi.Optimizer(grb_env()))
 	# set_optimizer_attribute(m, "Threads", 8)
 	!verbose && set_silent(m)
 	# set_optimizer_attribute(m, "TimeLimit", 600)
@@ -46,7 +46,7 @@ function milp_overlap_model(q, u; k, T, G=5, verbose=false)
 	M = G * maximum(u) + 1  # big M bound for the `implication constraints`
 
 	# Create model and set parameters
-	m = Model(() -> Gurobi.Optimizer(GRB_ENV))
+	m = Model(() -> Gurobi.Optimizer(grb_env()))
 	# set_optimizer_attribute(m, "Threads", 8)
 	!verbose && set_silent(m)
 	# set_optimizer_attribute(m, "TimeLimit", 600)

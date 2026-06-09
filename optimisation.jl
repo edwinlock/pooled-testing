@@ -1,8 +1,18 @@
 using JuMP, Gurobi, DataStructures
 
-# Define constants
-const GRB_ENV = Gurobi.Env()
 const Population{T} = Dict{T, Tuple{Float64, Int}} where T  # interpretation: participant ids are mapped to (q, u)
+
+# Gurobi environments are not safe to share across concurrent optimizations, so
+# we keep one environment per thread and create them lazily on first use. Model
+# code should call `grb_env()` instead of referencing a shared global.
+const GRB_ENVS = Vector{Union{Nothing, Gurobi.Env}}(nothing, Threads.nthreads())
+function grb_env()
+    tid = Threads.threadid()
+    if GRB_ENVS[tid] === nothing
+        GRB_ENVS[tid] = Gurobi.Env()
+    end
+    return GRB_ENVS[tid]
+end
 
 include("models/utils.jl")
 include("models/approximation-models.jl")
@@ -31,7 +41,7 @@ end
 function exact(population::Population; k=1, T, G, verbose=false)
     pop = copy(population)  # makes defensive copy
     remove_zeros!(pop)
-    isempty(pop) && return 0, Dict()
+    isempty(pop) && return 0., [], 0.  # (welfare, pools, error) contract
     q, u, keylist = pop2vec(pop)  # Get input vectors for model
     if T==1 && k==1
         m, x = single_mosek(q, u; G=G, verbose=verbose)
@@ -54,7 +64,7 @@ conic(pop::Population; G=5, verbose=false) = exact(pop, T=1, G=G, verbose=verbos
 function approximate(population::Population; T, G=5, K=15, verbose=false)
     pop = copy(population)  # makes defensive copy
     remove_zeros!(pop)
-    isempty(pop) && return 0, Dict()
+    isempty(pop) && return 0., [], 0.  # (welfare, pools, error) contract
     clusters = pop2clusters(pop)
     q, u, n, keylist = cluster2vec(clusters)
     T = min(T,sum(n))  # can't have more tests than people

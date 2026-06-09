@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(julia /tmp/verify_scale.jl)",
+      "Read(//Users/k2585143/github/PooledTesting.jl/old_experiments/**)",
+      "Read(//Users/k2585143/.julia/juliaup/**)",
+      "Bash(kill 30295 28026 25053 23818)",
+      "Bash(pkill -f \"verify_scale.jl\")",
+      "Bash(rm -f /tmp/verify_scale.jl)",
+      "Bash(break)",
+      "WebSearch",
+      "WebFetch(domain:docs.mosek.com)",
+      "WebFetch(domain:www.mosek.com)",
+      "WebFetch(domain:support.gurobi.com)",
+      "WebFetch(domain:julialang.org)",
+      "Bash(julia --project=. -e 'using ProgressBars; println\\(isdefined\\(ProgressBars, :update\\)\\); println\\(hasmethod\\(ProgressBar, Tuple{}, \\(:total,\\)\\)\\)')",
+      "Bash(pkill -f b43pnm2mv)",
+      "Bash(timeout 90 julia -e 'Meta.parseall\\(read\\(\"experiments.jl\", String\\)\\); println\\(\"PARSE OK\"\\)')",
+      "Bash(cd ~/github/PooledTesting.jl; grep -n \"isempty\\\\|return 0\\\\|return.*Dict\\\\|return w\\\\|return.*error\\\\|function milp\\\\|function greedy\\\\|function exact\\\\|function overlap\" src/optimisation.jl)",
+      "Read(//Users/k2585143/github/PooledTesting.jl/**)",
+      "Bash(awk 'NR>=280 && NR<=345 && \\(/^function /||/return /\\)' src/optimisation.jl)"
+    ],
+    "additionalDirectories": [
+      "/Users/k2585143/github/PooledTesting.jl/src"
+    ]
+  }
+}

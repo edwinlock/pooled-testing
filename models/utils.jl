@@ -29,7 +29,7 @@ function scale_utilities(pop::Population, upper)
     factor = max_util <= upper ? 1 : upper / max_util  #  no need to scale if max_util <= upper
     output = empty(pop)
     for (key, val) in pop
-        output[key] = (val[1], Int(round(factor*val[2])))
+        output[key] = (val[1], clamp(round(Int, factor*val[2]), 1, upper))
     end
     return output
 end

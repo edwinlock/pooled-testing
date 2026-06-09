@@ -1,0 +1,3 @@
+# Private keys / credentials — never commit these
+*.pem
+pooled-testing.pem
