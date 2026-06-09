@@ -57,9 +57,10 @@ Decide on Spot before launching, then follow the numbered setup steps below.
    interrupted mid-solve has no CSV yet and re-runs from scratch, so this loses
    at most the in-progress experiment regardless of sync interval.
 
-   (S3 access requires either an IAM instance role attached to the EC2 instance,
-   or `aws configure` with credentials. An instance role is preferred so no keys
-   live on the box.)
+   For the instance to access S3, attach an **IAM role** to it (see below). This
+   gives the AWS CLI temporary, auto-rotating credentials with no keys stored on
+   the box — preferable to `aws configure`, especially on a disposable Spot
+   instance.
 
 3. After an interruption, relaunch, sync the results down (step 2), and re-run
    the same command — completed experiments are skipped automatically:
@@ -67,6 +68,41 @@ Decide on Spot before launching, then follow the numbered setup steps below.
    ```sh
    julia --project=. -t auto experiments.jl
    ```
+
+### Setting up the S3 bucket and IAM role (one-time)
+
+These give the instance somewhere to store results and permission to do so. You
+only set this up once; afterwards you just attach the role to each instance.
+
+**Create a bucket** (S3 → Create bucket). Pick a globally-unique name and the
+same region as your instance (to avoid cross-region transfer costs). This name
+replaces `YOUR_BUCKET` in the sync commands above.
+
+**Create an IAM role for EC2** (IAM → Roles → Create role → trusted entity
+*AWS service* → *EC2*). Attach a policy scoped to just this bucket rather than
+the broad `AmazonS3FullAccess`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+    "Resource": [
+      "arn:aws:s3:::YOUR_BUCKET",
+      "arn:aws:s3:::YOUR_BUCKET/*"
+    ]
+  }]
+}
+```
+
+Name the role (e.g. `pooled-testing-s3`) and create it.
+
+**Attach the role to the instance**: either at launch under "IAM instance
+profile", or on a running instance via EC2 → Actions → Security → *Modify IAM
+role*. The role is per-instance, so re-attach it (or set it at launch) each time
+you start a fresh Spot instance. Once attached, the `aws s3 sync` commands above
+work with no further credential setup.
 
 ## 1. Connect and copy over the licence files
 
