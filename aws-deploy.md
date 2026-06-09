@@ -93,9 +93,36 @@ matching instance profile for you automatically.)
 
 ### Launching the instance
 
-The command launches an ARM Spot `c8g.24xlarge` using the latest Amazon Linux
-2023 ARM image (resolved automatically, so no region-specific AMI ID is needed),
-with the IAM role attached and a 30 GB root disk:
+The launch command needs a **key pair** name and a **security group** ID, both
+in `us-east-2`. Find them first.
+
+List your key pairs (use the name matching your `.pem`; key pairs are
+per-region, so it must exist in `us-east-2`):
+
+```sh
+aws ec2 describe-key-pairs --region us-east-2 --query 'KeyPairs[].KeyName' --output text
+```
+
+List security groups and their inbound rules, and pick one that allows SSH
+(port 22). A console-created `launch-wizard-*` group usually does:
+
+```sh
+aws ec2 describe-security-groups --region us-east-2 \
+  --query 'SecurityGroups[].{ID:GroupId,Name:GroupName,Ingress:IpPermissions}'
+```
+
+If none allows SSH, create one and open port 22 to your IP (find it with
+`curl -s ifconfig.me`; use `0.0.0.0/0` to allow any IP, less secure):
+
+```sh
+aws ec2 create-security-group --region us-east-2 --group-name pooled-testing-sg --description "SSH for pooled-testing"
+aws ec2 authorize-security-group-ingress --region us-east-2 --group-name pooled-testing-sg --protocol tcp --port 22 --cidr YOUR.IP.ADDRESS/32
+```
+
+Then launch — an ARM Spot `c8g.24xlarge` using the latest Amazon Linux 2023 ARM
+image (resolved automatically, so no region-specific AMI ID is needed), with the
+IAM role attached and a 30 GB root disk. Substitute the key pair name and
+security group ID from above:
 
 ```sh
 aws ec2 run-instances \
@@ -104,16 +131,11 @@ aws ec2 run-instances \
   --instance-type c8g.24xlarge \
   --instance-market-options '{"MarketType":"spot"}' \
   --key-name YOUR_KEY_NAME \
-  --security-group-ids YOUR_SECURITY_GROUP_ID \
+  --security-group-ids sg-XXXXXXXXXXXXXXXXX \
   --iam-instance-profile Name=pooled-testing-s3 \
   --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pooled-testing}]'
 ```
-
-Replace `YOUR_KEY_NAME` (the EC2 key pair matching your `.pem` file) and
-`YOUR_SECURITY_GROUP_ID` (a security group allowing inbound SSH on port 22 from
-your IP). The key pair, security group, and IAM role must all exist in
-`us-east-2`.
 
 Get the public DNS name to SSH into:
 
