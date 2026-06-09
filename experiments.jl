@@ -64,16 +64,16 @@ function run_experiments(algs, populations, budgets, poolsizes; multithread=fals
         Threads.@threads for k in eachindex(work)
             i, pop, T, G = work[k]
             results[k] = run_cell(algs, i, pop, T, G)
-            next!(progress; desc=celldesc(T, G))
+            ProgressMeter.next!(progress; desc=celldesc(T, G))
         end
     else
         for k in eachindex(work)
             i, pop, T, G = work[k]
             # Update the description to the cell about to run, so a long solve
             # shows its own budget/G in the bar while it churns.
-            update!(progress; desc=celldesc(T, G))
+            ProgressMeter.update!(progress; desc=celldesc(T, G))
             results[k] = run_cell(algs, i, pop, T, G)
-            next!(progress; desc=celldesc(T, G))
+            ProgressMeter.next!(progress; desc=celldesc(T, G))
         end
     end
     # Assemble the DataFrame serially (DataFrame push! is not thread-safe).
