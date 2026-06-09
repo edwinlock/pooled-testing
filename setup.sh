@@ -86,14 +86,15 @@ export PATH="$PATH:$HOME/julia-$JULIA_VERSION/bin"
 
 echo "==> Instantiating the Julia project"
 cd "$REPO_DIR"
-# Ensure the General registry is present and current before resolving — on a
-# fresh depot `resolve` can otherwise fail to find packages ("check_registered").
+# A fresh Julia depot has no package registries, so `resolve` fails with "no
+# registries have been installed". Add the General registry first (a no-op if it
+# is already present), then resolve and instantiate.
 julia --project=. -e '
     using Pkg
-    try
-        Pkg.Registry.update()
-    catch
+    if isempty(Pkg.Registry.reachable_registries())
         Pkg.Registry.add("General")
+    else
+        Pkg.Registry.update()
     end
     Pkg.resolve()
     Pkg.instantiate()'
