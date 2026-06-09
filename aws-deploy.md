@@ -18,15 +18,47 @@ re-run regardless). So an interrupted run just needs to be restarted.
 Decide on Spot before launching, then follow the numbered setup steps below.
 
 1. Request the instance as Spot when launching — in the EC2 console tick
-   "Request Spot Instances", or via the CLI:
+   "Request Spot Instances", or via the CLI. The command below launches an ARM
+   Spot instance in the Ohio region (`us-east-2`, typically the cheapest), using
+   the latest Amazon Linux 2023 ARM image (resolved automatically so no
+   region-specific AMI ID is needed), with the S3 IAM role attached and a 30 GB
+   root disk:
 
    ```sh
-   aws ec2 run-instances --instance-market-options '{"MarketType":"spot"}' ...
+   aws ec2 run-instances \
+     --region us-east-2 \
+     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
+     --instance-type c8g.24xlarge \
+     --instance-market-options '{"MarketType":"spot"}' \
+     --key-name YOUR_KEY_NAME \
+     --security-group-ids YOUR_SECURITY_GROUP_ID \
+     --iam-instance-profile Name=pooled-testing-s3 \
+     --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
+     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pooled-testing}]'
+   ```
+
+   Replace `YOUR_KEY_NAME` (the EC2 key pair matching your `.pem` file),
+   `YOUR_SECURITY_GROUP_ID` (a security group that allows inbound SSH on port 22
+   from your IP), and the IAM profile name if you named it differently. Note the
+   key pair, security group, and IAM role must all exist in `us-east-2`.
+
+   After it launches, get the public DNS name to SSH into (step 1 below):
+
+   ```sh
+   aws ec2 describe-instances --region us-east-2 \
+     --filters 'Name=tag:Name,Values=pooled-testing' 'Name=instance-state-name,Values=running' \
+     --query 'Reservations[].Instances[].PublicDnsName' --output text
    ```
 
    Mid-size instances (e.g. `c8g.16xlarge` / `c8g.24xlarge`) usually have lower
    interruption rates than the largest sizes; check the Spot price history and
-   interruption frequency for your region first.
+   interruption frequency for `us-east-2` first:
+
+   ```sh
+   aws ec2 describe-spot-price-history --region us-east-2 \
+     --instance-types c8g.24xlarge --product-descriptions "Linux/UNIX" \
+     --query 'SpotPriceHistory[0:5].[AvailabilityZone,SpotPrice]' --output table
+   ```
 
 2. Persist the experiment outputs to S3 so they survive a termination. The
    repository itself does not need persisting (it is cloned from git); only the
