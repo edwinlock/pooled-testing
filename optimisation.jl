@@ -14,6 +14,13 @@ function grb_env()
     return GRB_ENVS[tid]
 end
 
+# MOSEK's library aborts (TBB init_external_thread) when entered concurrently
+# from multiple Julia worker threads on this platform — capping its internal
+# threads does not help, since the crash is in thread *registration*, not its
+# thread pool. Serialise MOSEK solves with this lock; Gurobi solves (per-thread
+# env) still run in parallel.
+const MOSEK_LOCK = ReentrantLock()
+
 include("models/utils.jl")
 include("models/approximation-models.jl")
 include("models/linear-models.jl")
@@ -43,14 +50,23 @@ function exact(population::Population; k=1, T, G, verbose=false)
     remove_zeros!(pop)
     isempty(pop) && return 0., [], 0.  # (welfare, pools, error) contract
     q, u, keylist = pop2vec(pop)  # Get input vectors for model
-    if T==1 && k==1
+    uses_mosek = T==1 && k==1
+    if uses_mosek
         m, x = single_mosek(q, u; G=G, verbose=verbose)
     elseif k==1
         m, x = milp_disjoint_model(q, u; T=T, G=G, verbose=verbose)
     else
         m, x = milp_overlap_model(q, u; k=k, T=T, G=G, verbose=verbose)
     end
-    optimize!(m)
+    # MOSEK cannot be entered concurrently from Julia threads (see MOSEK_LOCK);
+    # serialise it. Gurobi MILP solves are per-thread isolated and run in parallel.
+    if uses_mosek
+        lock(MOSEK_LOCK) do
+            optimize!(m)
+        end
+    else
+        optimize!(m)
+    end
     _, p = retrieve(m, x, T, length(q))
     pools = [[keylist[i] for i in pool] for pool in p]
     w = welfare(pools, pop)
