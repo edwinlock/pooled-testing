@@ -3,7 +3,7 @@
 **Instance type:** use an ARM (Graviton) compute-optimised instance, e.g.
 `c8g.24xlarge` (96 vCPUs) or `c8g.16xlarge` (64 vCPUs). These match the ARM
 Julia/Gurobi/MOSEK builds downloaded below. Pick the size to fit the parallel
-experiments: experiments 3–6 run their independent solves across Julia threads,
+experiments: experiments 3–5 run their independent solves across Julia threads,
 so launch Julia with `-t auto` (see step 7) to use all the cores. `c8g.48xlarge`
 (192 vCPUs) is the largest, but is only worth it if you saturate it.
 
@@ -111,7 +111,7 @@ tmux new -s experiments
 ```
 
 Inside the tmux session, run the experiments. Always pass `--project=.` so Julia
-uses this environment, and `-t auto` so the parallel experiments (3–6) use all
+uses this environment, and `-t auto` so the parallel experiments (3–5) use all
 available cores.
 
 ```sh
@@ -119,11 +119,33 @@ available cores.
 julia --project=. -t auto experiments.jl
 
 # Run only specific experiments (comma-separated)
-julia --project=. -t auto experiments.jl --experiments 1,3,6
+julia --project=. -t auto experiments.jl --experiments 1,3,5
 ```
 
 Detach with `Ctrl-b` then `d` (the run keeps going); you can now disconnect SSH.
 Reattach later with `tmux attach -t experiments`, or list sessions with `tmux ls`.
+
+### Monitoring CPU usage with `htop`
+
+To watch CPU/memory load (e.g. to confirm all cores are busy) while the
+experiments run, open a second tmux window and start `htop` there, leaving the
+experiments running in the first window.
+
+Install `htop` if needed:
+
+```sh
+sudo yum install -y htop
+```
+
+With the experiments running in window 0:
+
+- Press `Ctrl-b` then `c` to create a new window, then run `htop` in it.
+- Switch between windows with `Ctrl-b` then `n` (next) or `p` (previous), or
+  jump directly with `Ctrl-b` then the window number (`Ctrl-b 0` for the
+  experiments, `Ctrl-b 1` for htop).
+- Press `q` to quit `htop`, and `Ctrl-b` then `&` to close its window when done.
+
+`Ctrl-b w` lists all windows so you can pick one from a menu.
 
 ## Running on a Spot Instance (cheaper)
 

@@ -2,7 +2,7 @@
 #
 # Run from the command line, selecting which experiments to run:
 #
-#     julia experiments.jl --experiments 1,3,6
+#     julia experiments.jl --experiments 1,3,5
 #     julia experiments.jl                       # runs all experiments
 #     julia experiments.jl --rootdir path/to/dir # set output root directory
 #
@@ -203,7 +203,8 @@ end
 ## GLOBAL PARAMETERS
 
 const UTIL_UPPER_BOUND = 50
-const BUDGETS = [2, 4, 6, 8, 10, 12]
+const PILOT_BUDGETS = collect(2:4:34)      # {2, 6, ..., 34} for the pilot experiments
+const SYNTHETIC_BUDGETS = collect(2:2:12)  # {2, 4, ..., 12} for the synthetic experiments
 
 
 ## EXPERIMENTS
@@ -239,7 +240,7 @@ approx_vs_greedy(K) = [
 
 
 """
-Run an approx-vs-greedy experiment on the pilot population (experiments 0–2).
+Run an approx-vs-greedy experiment on the pilot population (experiments 1–2).
 Single population, so timings are kept clean by running single-threaded.
 """
 function pilot_experiment(num; rootdir, G, budgets, K, seed, desc)
@@ -257,7 +258,7 @@ end
 
 """
 Run an approx-vs-greedy experiment on `reps` synthetic populations of size `n`
-(experiments 3–5). Solves run multithreaded and welfare/ratio plots are written.
+(experiments 3–4). Solves run multithreaded and welfare/ratio plots are written.
 """
 function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
     println("\nSTARTING EXPERIMENT $(num): $(desc)")
@@ -265,7 +266,7 @@ function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
     ensure_dirs(rootdir)
     populations = synthetic_populations(rootdir, n, reps)
     algs = approx_vs_greedy(K)
-    df = run_experiments(algs, populations, BUDGETS, [G]; multithread=true)
+    df = run_experiments(algs, populations, SYNTHETIC_BUDGETS, [G]; multithread=true)
     add_comparisons!(df, algs)
     save_results(df, num, rootdir)
     plot_welfares(df, joinpath(rootdir, "figs", "exp$(num)-welfares.pdf"))
@@ -274,16 +275,12 @@ function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
 end
 
 
-# Experiment 0 (for Evi): approx vs greedy for pilot data, G=5, testing budget of 30.
-experiment0(; rootdir=".") = pilot_experiment(0; rootdir, G=5, budgets=[30], K=25, seed=1001,
-    desc="pilot data, G=5, and a testing budget of 30")
-
 # Experiment 1: approx vs greedy for pilot data and G=5.
-experiment1(; rootdir=".") = pilot_experiment(1; rootdir, G=5, budgets=BUDGETS, K=25, seed=1002,
+experiment1(; rootdir=".") = pilot_experiment(1; rootdir, G=5, budgets=PILOT_BUDGETS, K=25, seed=1002,
     desc="pilot data and G=5")
 
 # Experiment 2: approx vs greedy for pilot data and G=10.
-experiment2(; rootdir=".") = pilot_experiment(2; rootdir, G=10, budgets=BUDGETS, K=25, seed=1003,
+experiment2(; rootdir=".") = pilot_experiment(2; rootdir, G=10, budgets=PILOT_BUDGETS, K=25, seed=1003,
     desc="pilot data and G=10")
 
 # Experiment 3: approx vs greedy with synthetic populations, n=200, G=5.
@@ -294,16 +291,12 @@ experiment3(; rootdir=".") = synthetic_experiment(3; rootdir, n=200, G=5, K=20, 
 experiment4(; rootdir=".") = synthetic_experiment(4; rootdir, n=200, G=10, K=20, reps=20, seed=2002,
     desc="synthetic populations, n=200, G=10")
 
-# Experiment 5: approx vs greedy with synthetic populations, n=200, G=200.
-experiment5(; rootdir=".") = synthetic_experiment(5; rootdir, n=200, G=200, K=10, reps=20, seed=2003,
-    desc="synthetic populations, n=200, G=200")
-
 
 """
-Experiment 6: non-overlapping (disjoint) vs 2-overlapping testing with n=10, G=10.
+Experiment 5: non-overlapping (disjoint) vs 2-overlapping testing with n=10, G=10.
 """
-function experiment6(; rootdir=".")
-    println("\nSTARTING EXPERIMENT 6: disjoint vs 2-overlap")
+function experiment5(; rootdir=".")
+    println("\nSTARTING EXPERIMENT 5: disjoint vs 2-overlap")
     Random.seed!(3001)  # for reproducibility
     ensure_dirs(rootdir)
     n = 10
@@ -315,13 +308,13 @@ function experiment6(; rootdir=".")
         (name=:two_overlap, fn=exact, args=Dict(:k => 2)),
     ]
     G = n
-    exp6 = run_experiments(algs, small_populations, small_budgets, [G]; multithread=true)
+    exp5 = run_experiments(algs, small_populations, small_budgets, [G]; multithread=true)
     # Reverse the alg order so diff/ratio are two_overlap vs disjoint (2-overlap ≥ disjoint, so diff ≥ 0).
-    add_comparisons!(exp6, [algs[2], algs[1]])
-    CSV.write(joinpath(rootdir, "data", "exp6-data.csv"), exp6)
+    add_comparisons!(exp5, [algs[2], algs[1]])
+    CSV.write(joinpath(rootdir, "data", "exp5-data.csv"), exp5)
 
     # Welfares (violin)
-    @df exp6 violin(
+    @df exp5 violin(
         :budget,
         :disjoint_welfare,
         side=:left,
@@ -332,13 +325,13 @@ function experiment6(; rootdir=".")
         xlabel="Test budget",
         ylabel="Welfare",
         size=(400,300))
-    @df exp6 dotplot!(:budget, :disjoint_welfare, side=:left, marker=(:black,stroke(0)), label="")
-    @df exp6 violin!(:budget, :two_overlap_welfare, side=:right, linewidth=0, label="2-Overlap")
-    @df exp6 dotplot!(:budget, :two_overlap_welfare, side=:right, marker=(:black,stroke(0)), label="")
-    Plots.pdf(joinpath(rootdir, "figs", "exp6-welfares.pdf"))
+    @df exp5 dotplot!(:budget, :disjoint_welfare, side=:left, marker=(:black,stroke(0)), label="")
+    @df exp5 violin!(:budget, :two_overlap_welfare, side=:right, linewidth=0, label="2-Overlap")
+    @df exp5 dotplot!(:budget, :two_overlap_welfare, side=:right, marker=(:black,stroke(0)), label="")
+    Plots.pdf(joinpath(rootdir, "figs", "exp5-welfares.pdf"))
 
     # Ratios (violin)
-    @df exp6 violin(
+    @df exp5 violin(
         :budget,
         :ratio,
         linewidth=0,
@@ -348,35 +341,33 @@ function experiment6(; rootdir=".")
         ylabel="Welfare ratio",
         xticks=small_budgets,
         size=(400,300))
-    @df exp6 dotplot!(:budget, :ratio, marker=(:black,stroke(0)), label="")
-    Plots.pdf(joinpath(rootdir, "figs", "exp6-ratios.pdf"))
+    @df exp5 dotplot!(:budget, :ratio, marker=(:black,stroke(0)), label="")
+    Plots.pdf(joinpath(rootdir, "figs", "exp5-ratios.pdf"))
 
     # Disjoint vs 2-overlap scatter (alternative to the violin plot)
-    plot_disjoint_vs_overlap(exp6, joinpath(rootdir, "figs", "exp6-scatter.pdf"))
+    plot_disjoint_vs_overlap(exp5, joinpath(rootdir, "figs", "exp5-scatter.pdf"))
 
     # Summary table
     output = combine(
-        groupby(exp6, :budget),
+        groupby(exp5, :budget),
         :disjoint_welfare => mean,
         :disjoint_time => roundmean => "disjoint time",
         :two_overlap_welfare => mean,
         :two_overlap_time => roundmean => "2-overlap time",
     )
-    open(joinpath(rootdir, "tables", "exp6-summary.tex"), "w") do io; show(io, "text/latex", output); end
-    return exp6
+    open(joinpath(rootdir, "tables", "exp5-summary.tex"), "w") do io; show(io, "text/latex", output); end
+    return exp5
 end
 
 
 ## COMMAND LINE INTERFACE
 
 const EXPERIMENTS = Dict(
-    "0" => experiment0,
     "1" => experiment1,
     "2" => experiment2,
     "3" => experiment3,
     "4" => experiment4,
     "5" => experiment5,
-    "6" => experiment6,
 )
 
 # Sorted experiment numbers for help text and default "run all".
@@ -386,7 +377,7 @@ function parse_commandline(args)
     s = ArgParseSettings(description="Run pooled testing experiments")
     @add_arg_table! s begin
         "--experiments"
-            help = "Comma-separated experiments to run, e.g. \"1,3,6\". Available: $(join(EXPERIMENT_NUMBERS, ", ")). Default: all."
+            help = "Comma-separated experiments to run, e.g. \"1,3,5\". Available: $(join(EXPERIMENT_NUMBERS, ", ")). Default: all."
             arg_type = String
             default = join(EXPERIMENT_NUMBERS, ",")
         "--rootdir"

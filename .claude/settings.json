@@ -19,7 +19,16 @@
       "Bash(timeout 90 julia -e 'Meta.parseall\\(read\\(\"experiments.jl\", String\\)\\); println\\(\"PARSE OK\"\\)')",
       "Bash(cd ~/github/PooledTesting.jl; grep -n \"isempty\\\\|return 0\\\\|return.*Dict\\\\|return w\\\\|return.*error\\\\|function milp\\\\|function greedy\\\\|function exact\\\\|function overlap\" src/optimisation.jl)",
       "Read(//Users/k2585143/github/PooledTesting.jl/**)",
-      "Bash(awk 'NR>=280 && NR<=345 && \\(/^function /||/return /\\)' src/optimisation.jl)"
+      "Bash(awk 'NR>=280 && NR<=345 && \\(/^function /||/return /\\)' src/optimisation.jl)",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.resolve\\(\\); Pkg.instantiate\\(\\); println\\(\"RESOLVE+INSTANTIATE OK\"\\)')",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Re-resolve Manifest for Julia 1.12 deps; fix deploy doc resolve step *)",
+      "Bash(git --no-pager log --oneline -1)",
+      "Bash(cd '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper')",
+      "Bash(ls -la *.tex)",
+      "Bash(cd '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper' *)",
+      "Read(//Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/**)",
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"experiments.jl\",String\\)\\); println\\(\"PARSE OK\"\\)')"
     ],
     "additionalDirectories": [
       "/Users/k2585143/github/PooledTesting.jl/src"

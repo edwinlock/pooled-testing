@@ -24,7 +24,7 @@ Alternatively, from the Julia REPL press `]` to enter the package manager and ru
 
 ## Run the experiments
 
-Pass `-t auto` so the parallel experiments (3–6) use all available CPU cores.
+Pass `-t auto` so the parallel experiments (3–5) use all available CPU cores.
 
 Run all experiments:
 
@@ -35,7 +35,7 @@ julia --project=. -t auto experiments.jl
 Run only specific experiments (comma-separated):
 
 ```sh
-julia --project=. -t auto experiments.jl --experiments 1,3,6
+julia --project=. -t auto experiments.jl --experiments 1,3,5
 ```
 
 Write outputs (under `data/`, `tables/`, `figs/`) to a different root directory:
