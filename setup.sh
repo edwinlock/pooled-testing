@@ -57,7 +57,7 @@ fi
 
 if [[ ! -d "$HOME/mosek" ]]; then
     wget -q "https://download.mosek.com/stable/$MOSEK_VERSION/mosektoolslinuxaarch64.tar.bz2"
-    tar zxjf "mosektoolslinuxaarch64.tar.bz2"
+    tar xjf "mosektoolslinuxaarch64.tar.bz2"
 fi
 
 echo "==> Writing environment variables to ~/.bashrc"
