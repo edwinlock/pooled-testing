@@ -1,3 +1,8 @@
 # Private keys / credentials — never commit these
 *.pem
 pooled-testing.pem
+
+# Local AWS setup artifacts (installer + generated IAM policy files)
+AWSCLIV2.pkg
+trust-policy.json
+s3-policy.json
