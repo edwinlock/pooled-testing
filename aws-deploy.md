@@ -15,104 +15,27 @@ it resumes cleanly: each experiment writes `data/expN-data.csv` on completion,
 and re-running skips any experiment whose CSV already exists (pass `--force` to
 re-run regardless). So an interrupted run just needs to be restarted.
 
-Decide on Spot before launching, then follow the numbered setup steps below.
+All commands below use the Ohio region (`us-east-2`, typically the cheapest).
 
-1. Request the instance as Spot when launching — in the EC2 console tick
-   "Request Spot Instances", or via the CLI. The command below launches an ARM
-   Spot instance in the Ohio region (`us-east-2`, typically the cheapest), using
-   the latest Amazon Linux 2023 ARM image (resolved automatically so no
-   region-specific AMI ID is needed), with the S3 IAM role attached and a 30 GB
-   root disk:
+### One-time prerequisites: S3 bucket and IAM role
 
-   ```sh
-   aws ec2 run-instances \
-     --region us-east-2 \
-     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
-     --instance-type c8g.24xlarge \
-     --instance-market-options '{"MarketType":"spot"}' \
-     --key-name YOUR_KEY_NAME \
-     --security-group-ids YOUR_SECURITY_GROUP_ID \
-     --iam-instance-profile Name=pooled-testing-s3 \
-     --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
-     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pooled-testing}]'
-   ```
+These give the instance somewhere to store results and permission to do so. Set
+them up **once**; they are account-level resources that survive terminations.
 
-   Replace `YOUR_KEY_NAME` (the EC2 key pair matching your `.pem` file),
-   `YOUR_SECURITY_GROUP_ID` (a security group that allows inbound SSH on port 22
-   from your IP), and the IAM profile name if you named it differently. Note the
-   key pair, security group, and IAM role must all exist in `us-east-2`.
+**1. Create the S3 bucket.** Bucket names are globally unique, so pick something
+like `edwinlock-pooled-testing`. Outside `us-east-1` the `LocationConstraint` is
+required. This name replaces `YOUR_BUCKET` everywhere below.
 
-   After it launches, get the public DNS name to SSH into (step 1 below):
+```sh
+aws s3api create-bucket \
+  --bucket YOUR_BUCKET \
+  --region us-east-2 \
+  --create-bucket-configuration LocationConstraint=us-east-2
+```
 
-   ```sh
-   aws ec2 describe-instances --region us-east-2 \
-     --filters 'Name=tag:Name,Values=pooled-testing' 'Name=instance-state-name,Values=running' \
-     --query 'Reservations[].Instances[].PublicDnsName' --output text
-   ```
-
-   Mid-size instances (e.g. `c8g.16xlarge` / `c8g.24xlarge`) usually have lower
-   interruption rates than the largest sizes; check the Spot price history and
-   interruption frequency for `us-east-2` first:
-
-   ```sh
-   aws ec2 describe-spot-price-history --region us-east-2 \
-     --instance-types c8g.24xlarge --product-descriptions "Linux/UNIX" \
-     --query 'SpotPriceHistory[0:5].[AvailabilityZone,SpotPrice]' --output table
-   ```
-
-2. Persist the experiment outputs to S3 so they survive a termination. The
-   repository itself does not need persisting (it is cloned from git); only the
-   generated output directories `data/`, `tables/` and `figs/` matter. `data/`
-   is what the resume logic reads; `tables/` and `figs/` are the paper outputs.
-
-   On a **fresh instance**, sync any earlier results down *before* running, so
-   completed experiments are recognised and skipped:
-
-   ```sh
-   cd pooled-testing
-   for d in data tables figs; do aws s3 sync s3://YOUR_BUCKET/pooled-testing/$d $d; done
-   ```
-
-   While experiments run, sync the outputs **up** periodically so a 2-minute
-   spot-termination warning never costs more than one interval. Run this in a
-   separate tmux window (`Ctrl-b c`):
-
-   ```sh
-   cd pooled-testing
-   while true; do
-     for d in data tables figs; do aws s3 sync $d s3://YOUR_BUCKET/pooled-testing/$d; done
-     sleep 600   # every 10 minutes
-   done
-   ```
-
-   Note: only *completed* experiments are recoverable — an experiment
-   interrupted mid-solve has no CSV yet and re-runs from scratch, so this loses
-   at most the in-progress experiment regardless of sync interval.
-
-   For the instance to access S3, attach an **IAM role** to it (see below). This
-   gives the AWS CLI temporary, auto-rotating credentials with no keys stored on
-   the box — preferable to `aws configure`, especially on a disposable Spot
-   instance.
-
-3. After an interruption, relaunch, sync the results down (step 2), and re-run
-   the same command — completed experiments are skipped automatically:
-
-   ```sh
-   julia --project=. -t auto experiments.jl
-   ```
-
-### Setting up the S3 bucket and IAM role (one-time)
-
-These give the instance somewhere to store results and permission to do so. You
-only set this up once; afterwards you just attach the role to each instance.
-
-**Create a bucket** (S3 → Create bucket). Pick a globally-unique name and the
-same region as your instance (to avoid cross-region transfer costs). This name
-replaces `YOUR_BUCKET` in the sync commands above.
-
-**Create an IAM role for EC2** (IAM → Roles → Create role → trusted entity
-*AWS service* → *EC2*). Attach a policy scoped to just this bucket rather than
-the broad `AmazonS3FullAccess`:
+**2. Create an IAM role for EC2**, scoped to just this bucket (preferred over
+the broad `AmazonS3FullAccess`). In the console: IAM → Roles → Create role →
+trusted entity *AWS service* → *EC2*, then attach a policy with:
 
 ```json
 {
@@ -128,13 +51,86 @@ the broad `AmazonS3FullAccess`:
 }
 ```
 
-Name the role (e.g. `pooled-testing-s3`) and create it.
+Name the role `pooled-testing-s3` (matching the launch command below). The role
+gives the instance temporary, auto-rotating credentials — no keys stored on the
+disposable Spot box.
 
-**Attach the role to the instance**: either at launch under "IAM instance
-profile", or on a running instance via EC2 → Actions → Security → *Modify IAM
-role*. The role is per-instance, so re-attach it (or set it at launch) each time
-you start a fresh Spot instance. Once attached, the `aws s3 sync` commands above
-work with no further credential setup.
+### Launching the instance
+
+The command launches an ARM Spot `c8g.24xlarge` using the latest Amazon Linux
+2023 ARM image (resolved automatically, so no region-specific AMI ID is needed),
+with the IAM role attached and a 30 GB root disk:
+
+```sh
+aws ec2 run-instances \
+  --region us-east-2 \
+  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
+  --instance-type c8g.24xlarge \
+  --instance-market-options '{"MarketType":"spot"}' \
+  --key-name YOUR_KEY_NAME \
+  --security-group-ids YOUR_SECURITY_GROUP_ID \
+  --iam-instance-profile Name=pooled-testing-s3 \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pooled-testing}]'
+```
+
+Replace `YOUR_KEY_NAME` (the EC2 key pair matching your `.pem` file) and
+`YOUR_SECURITY_GROUP_ID` (a security group allowing inbound SSH on port 22 from
+your IP). The key pair, security group, and IAM role must all exist in
+`us-east-2`.
+
+Get the public DNS name to SSH into:
+
+```sh
+aws ec2 describe-instances --region us-east-2 \
+  --filters 'Name=tag:Name,Values=pooled-testing' 'Name=instance-state-name,Values=running' \
+  --query 'Reservations[].Instances[].PublicDnsName' --output text
+```
+
+Optionally check the current Spot price/availability across zones first:
+
+```sh
+aws ec2 describe-spot-price-history --region us-east-2 \
+  --instance-types c8g.24xlarge --product-descriptions "Linux/UNIX" \
+  --query 'SpotPriceHistory[0:5].[AvailabilityZone,SpotPrice]' --output table
+```
+
+Then connect and set up the instance via the numbered steps below.
+
+### Persisting results to S3
+
+So results survive a termination, sync the output directories `data/`, `tables/`
+and `figs/` to the bucket. The repository itself is not persisted (it is cloned
+from git); `data/` is what the resume logic reads, `tables/` and `figs/` are the
+paper outputs.
+
+On a **fresh instance**, sync any earlier results down *before* running, so
+completed experiments are recognised and skipped:
+
+```sh
+cd pooled-testing
+for d in data tables figs; do aws s3 sync s3://YOUR_BUCKET/pooled-testing/$d $d; done
+```
+
+While experiments run, sync the outputs **up** periodically so a 2-minute
+spot-termination warning never costs more than one interval. Run this in a
+separate tmux window (`Ctrl-b c`):
+
+```sh
+cd pooled-testing
+while true; do
+  for d in data tables figs; do aws s3 sync $d s3://YOUR_BUCKET/pooled-testing/$d; done
+  sleep 600   # every 10 minutes
+done
+```
+
+Only *completed* experiments are recoverable — an experiment interrupted
+mid-solve has no CSV yet and re-runs from scratch, so this loses at most the
+in-progress experiment regardless of sync interval.
+
+After an interruption, relaunch (the IAM role is set at launch above), sync the
+results down, and re-run the same command — completed experiments are skipped
+automatically.
 
 ## 1. Connect and copy over the licence files
 
@@ -209,13 +205,7 @@ Reattach later with `tmux attach -t experiments`, or list sessions with `tmux ls
 
 To watch CPU/memory load (e.g. to confirm all cores are busy) while the
 experiments run, open a second tmux window and start `htop` there, leaving the
-experiments running in the first window.
-
-Install `htop` if needed:
-
-```sh
-sudo yum install -y htop
-```
+experiments running in the first window (`htop` is installed by `setup.sh`).
 
 With the experiments running in window 0:
 
