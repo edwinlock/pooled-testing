@@ -31,7 +31,7 @@ scp -i pooled-testing.pem ~/mosek.lic ~/gurobi.lic ec2-user@ec2-3-145-200-200.us
 ## 2. Install bzip2
 
 ```sh
-sudo yum install bzip2
+sudo yum install bzip2 git
 ```
 
 ## 3. Download and unpack Julia, Gurobi and MOSEK
@@ -90,11 +90,12 @@ git clone https://github.com/edwinlock/pooled-testing.git
 ## 6. Instantiate the project environment
 
 The repository ships its own Julia environment (`Project.toml` + `Manifest.toml`).
-Download and pin its dependencies once:
+Resolve (in case the manifest was last pinned with a different Julia version)
+and download its dependencies once:
 
 ```sh
 cd pooled-testing
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
 ```
 
 ## 7. Run experiments inside `tmux`
