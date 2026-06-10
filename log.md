@@ -10,6 +10,8 @@ Concise running log of experiment runs and key changes. Newest first.
 - Added `showspeed=true` to progress bar so per-budget solve time (s/it) + elapsed are visible.
 - Exp-1 parallelisation: DONE. run_experiments now splits algs — Gurobi (approximate) solves run in parallel across Julia threads, greedy/MOSEK solves run serially on main thread (avoids the worker-thread crash). Pilot (1/2) and synthetic (3/4) now multithreaded.
 - Thread budget: each Gurobi solve uses GUROBI_THREADS=8. To avoid oversubscription, launch Julia with ~n/8 threads (e.g. `-t 12` on a 96-core box) so concurrent solves × 8 ≤ n. Benchmark showed Gurobi MILP sweet spot is ~4–8 threads (16+ slower).
+- @threads :greedy scheduling for the parallel pass — pulls cells one at a time so no thread idles while another grinds a slow solve (MILP times vary a lot).
+- Running on c8g.8xlarge (32 vCPU, on-demand) — on-demand quota was 32, spot was 96; they're separate. Use `-t 4`.
 - Earlier: MOSEK aborts (TBB) on Julia worker threads on Linux aarch64 → exps 3/4 run serial; exp 5 (Gurobi-only) parallel.
 - Synthetic exps n=200 → n=150 (match paper). Pilot budgets capped at 30.
 - Infra: on Spot c8g/c7g us-east-2 (capacity flaky); S3 sync for results; setup.sh provisions instance.

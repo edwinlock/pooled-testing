@@ -92,8 +92,10 @@ function run_experiments(algs, populations, budgets, poolsizes; multithread=fals
             results[k] = Dict{Symbol, Any}(:budget => T, :population => i, :poolsize => G)
         end
         # Pass 1: Gurobi solves in parallel. Each thread writes its own index.
+        # :greedy scheduling pulls cells one at a time, so no thread idles while
+        # another grinds a slow solve (MILP solve times vary a lot).
         if !isempty(par_algs)
-            Threads.@threads for k in eachindex(work)
+            Threads.@threads :greedy for k in eachindex(work)
                 _, pop, T, G = work[k]
                 for alg in par_algs
                     run_alg!(results[k], alg, pop, T, G)
