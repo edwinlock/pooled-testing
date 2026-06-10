@@ -15,6 +15,8 @@ and pool size bound G, and accuracy parameter K.
 - `K::Int=15`: number of segments of piecewise-linear fn approximating exp constraint
 
 """
+
+
 """
 Domain `[A, B]` over which the exp constraint is piecewise-linearly approximated
 in the disjoint MILP, given probabilities `q`, utilities `u` and pool bound `G`.
