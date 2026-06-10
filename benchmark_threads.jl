@@ -51,7 +51,7 @@ function timed_solve(pop, T, G, K, threads)
 end
 
 # --- Parse args ---
-budget      = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 18
+budget      = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 14
 threadlist  = length(ARGS) >= 2 ? parse.(Int, split(ARGS[2], ",")) : [1, 2, 4, 8, 16, 32, 64, 96]
 G, K = 5, 25
 
