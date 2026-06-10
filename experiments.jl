@@ -331,19 +331,19 @@ end
 
 
 # Experiment 1: approx vs greedy for pilot data and G=5.
-experiment1(; rootdir=".") = pilot_experiment(1; rootdir, G=5, budgets=PILOT_BUDGETS, K=25, seed=1002,
+experiment1(; rootdir=".") = pilot_experiment(1; rootdir, G=5, budgets=PILOT_BUDGETS, K=15, seed=1002,
     desc="pilot data and G=5")
 
 # Experiment 2: approx vs greedy for pilot data and G=10.
-experiment2(; rootdir=".") = pilot_experiment(2; rootdir, G=10, budgets=PILOT_BUDGETS, K=25, seed=1003,
+experiment2(; rootdir=".") = pilot_experiment(2; rootdir, G=10, budgets=PILOT_BUDGETS, K=15, seed=1003,
     desc="pilot data and G=10")
 
 # Experiment 3: approx vs greedy with synthetic populations, n=150, G=5.
-experiment3(; rootdir=".") = synthetic_experiment(3; rootdir, n=150, G=5, K=20, reps=20, seed=2001,
+experiment3(; rootdir=".") = synthetic_experiment(3; rootdir, n=150, G=5, K=15, reps=20, seed=2001,
     desc="synthetic populations, n=150, G=5")
 
 # Experiment 4: approx vs greedy with synthetic populations, n=150, G=10.
-experiment4(; rootdir=".") = synthetic_experiment(4; rootdir, n=150, G=10, K=20, reps=20, seed=2002,
+experiment4(; rootdir=".") = synthetic_experiment(4; rootdir, n=150, G=10, K=15, reps=20, seed=2002,
     desc="synthetic populations, n=150, G=10")
 
 
