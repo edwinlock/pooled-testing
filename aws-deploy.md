@@ -119,7 +119,7 @@ aws ec2 create-security-group --region us-east-2 --group-name pooled-testing-sg 
 aws ec2 authorize-security-group-ingress --region us-east-2 --group-name pooled-testing-sg --protocol tcp --port 22 --cidr YOUR.IP.ADDRESS/32
 ```
 
-Then launch — an ARM Spot `c8g.24xlarge` using the latest Amazon Linux 2023 ARM
+Then launch — an ARM Spot `c8g.16xlarge` using the latest Amazon Linux 2023 ARM
 image (resolved automatically, so no region-specific AMI ID is needed), with the
 IAM role attached and a 30 GB root disk. Substitute the key pair name and
 security group ID from above:
@@ -128,7 +128,7 @@ security group ID from above:
 aws ec2 run-instances \
   --region us-east-2 \
   --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
-  --instance-type c8g.24xlarge \
+  --instance-type c8g.16xlarge \
   --instance-market-options '{"MarketType":"spot"}' \
   --key-name YOUR_KEY_NAME \
   --security-group-ids sg-XXXXXXXXXXXXXXXXX \
@@ -147,7 +147,7 @@ price, never reclaimed):
 aws ec2 run-instances \
   --region us-east-2 \
   --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
-  --instance-type c8g.24xlarge \
+  --instance-type c8g.16xlarge \
   --key-name YOUR_KEY_NAME \
   --security-group-ids sg-XXXXXXXXXXXXXXXXX \
   --iam-instance-profile Name=pooled-testing-s3 \
@@ -176,7 +176,7 @@ Optionally check the current Spot price/availability across zones first:
 
 ```sh
 aws ec2 describe-spot-price-history --region us-east-2 \
-  --instance-types c8g.24xlarge --product-descriptions "Linux/UNIX" \
+  --instance-types c8g.16xlarge --product-descriptions "Linux/UNIX" \
   --query 'SpotPriceHistory[0:5].[AvailabilityZone,SpotPrice]' --output table
 ```
 
@@ -260,17 +260,17 @@ First validate that the parallel solves run cleanly on this many-core machine by
 running just experiment 3 (the multithreaded, MOSEK-heavy one):
 
 ```sh
-julia --project=. -t 12 experiments.jl --experiments 3
+julia --project=. -t 8 experiments.jl --experiments 3
 ```
 
 Once that completes, start the full run:
 
 ```sh
 # Run all experiments
-julia --project=. -t 12 experiments.jl
+julia --project=. -t 8 experiments.jl
 
 # Or only specific experiments (comma-separated)
-julia --project=. -t 12 experiments.jl --experiments 1,3,5
+julia --project=. -t 8 experiments.jl --experiments 1,3,5
 ```
 
 Detach with `Ctrl-b` then `d` (the run keeps going); you can now disconnect SSH.
