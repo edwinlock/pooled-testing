@@ -15,6 +15,26 @@ and pool size bound G, and accuracy parameter K.
 - `K::Int=15`: number of segments of piecewise-linear fn approximating exp constraint
 
 """
+"""
+Domain `[A, B]` over which the exp constraint is piecewise-linearly approximated
+in the disjoint MILP, given probabilities `q`, utilities `u` and pool bound `G`.
+"""
+exp_domain(q, u, G) = (minimum(log.(u)) + G*minimum(log.(q)),
+                       log(G*maximum(u)) + maximum(log.(q)))
+
+"""
+Additive approximation guarantee `T*ε` of the disjoint MILP for budget `T` and
+`K` piecewise-linear segments, without building the model. `ε` is the per-segment
+error of the optimal K-segment approximation of `exp` over the welfare domain.
+Use it to study the accuracy/runtime trade-off when choosing `K` (smaller `K`
+means a smaller, faster MILP but a larger guarantee).
+"""
+function milp_guarantee(q, u; T, G=5, K=15)
+    A, B = exp_domain(q, u, G)
+    ε = upper_bounds(A, B, K)[4]
+    return T*ε
+end
+
 function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 	# Verify that input is consistent
 	@assert length(u) == length(q) == length(n) "Input vectors have different lengths."
@@ -27,7 +47,7 @@ function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 	C = length(n)  # number of clusters C
 	L, U = minimum(u), G*maximum(u)  # lower and upper bound for z[t] = x[t]⋅u
 	# Lower and upper bound for l[t] = log(x[t]⋅u) + sum(x[t,i]*log(q[i])
-	A, B = minimum(log.(u)) + G*minimum(log.(q)), log(G*maximum(u)) + maximum(log.(q))
+	A, B = exp_domain(q, u, G)
 
 	# Create model and set parameters
 	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(grb_env())))
