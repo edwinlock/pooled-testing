@@ -14,7 +14,9 @@ using CSV, DataFrames, Statistics, Dates, StatsPlots, Distributions, ProgressMet
 # Gurobi solver settings (used by the MILP models in optimisation.jl).
 # MIPGap: stop each solve once provably within this relative gap of optimal.
 # Threads: cap branch-and-bound threads (MILP parallelises poorly past a few).
-const GUROBI_MIPGAP = 0.005   # 0.5%
+const GUROBI_MIPGAP = 1e-4    # 0.01% — matches the paper's default; must stay
+                              # tighter than the MILP-vs-greedy difference
+                              # (0.004%–0.33% in Table 1) or the comparison is invalid
 const GUROBI_THREADS = 8
 
 # Include optimisation code
