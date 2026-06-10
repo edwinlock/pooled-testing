@@ -4,7 +4,7 @@
 `c8g.24xlarge` (96 vCPUs) or `c8g.16xlarge` (64 vCPUs). These match the ARM
 Julia/Gurobi/MOSEK builds downloaded below. Pick the size to fit the parallel
 experiments: experiments 3–5 run their independent solves across Julia threads,
-so launch Julia with `-t auto` (see step 4) to use all the cores. `c8g.48xlarge`
+so launch Julia with about cores÷8 threads (see step 4). `c8g.48xlarge`
 (192 vCPUs) is the largest, but is only worth it if you saturate it.
 
 ## Launching on a Spot Instance (cheaper)
@@ -137,6 +137,33 @@ aws ec2 run-instances \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pooled-testing}]'
 ```
 
+**On-demand instead of Spot.** Spot is cheaper but can be reclaimed (and large
+ARM Spot capacity in a region is sometimes unavailable — you may get
+`InsufficientInstanceCapacity`). For an uninterrupted run, drop the
+`--instance-market-options` line to launch on-demand (guaranteed capacity, full
+price, never reclaimed):
+
+```sh
+aws ec2 run-instances \
+  --region us-east-2 \
+  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
+  --instance-type c8g.24xlarge \
+  --key-name YOUR_KEY_NAME \
+  --security-group-ids sg-XXXXXXXXXXXXXXXXX \
+  --iam-instance-profile Name=pooled-testing-s3 \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pooled-testing}]'
+```
+
+On-demand and Spot use separate vCPU quotas, so if Spot fails with
+`MaxSpotInstanceCountExceeded` the on-demand launch may still work (and vice
+versa). On-demand bills by the hour until you terminate it, so remember to shut
+it down when the run finishes:
+
+```sh
+aws ec2 terminate-instances --region us-east-2 --instance-ids i-XXXXXXXXXXXXXXXXX
+```
+
 Get the public DNS name to SSH into:
 
 ```sh
@@ -219,24 +246,31 @@ tmux new -s experiments
 ```
 
 Inside the tmux session, run the experiments. Always pass `--project=.` so Julia
-uses this environment, and `-t auto` so the parallel experiments (3–5) use all
-available cores.
+uses this environment.
+
+**Choosing the thread count.** Each MILP solve runs Gurobi with `Threads=8`
+(its sweet spot — more is slower for these models), and the experiments run
+several solves in parallel across Julia threads. To use all cores *without*
+oversubscribing, launch Julia with about **cores ÷ 8** threads — e.g. `-t 12`
+on a 96-vCPU `c8g.24xlarge`, `-t 8` on a 64-vCPU `c8g.16xlarge`. Do **not** use
+`-t auto`: that starts one Julia thread per core, and with 8 Gurobi threads each
+it oversubscribes badly.
 
 First validate that the parallel solves run cleanly on this many-core machine by
-running just experiment 3 (the multithreaded MOSEK-heavy one):
+running just experiment 3 (the multithreaded, MOSEK-heavy one):
 
 ```sh
-julia --project=. -t auto experiments.jl --experiments 3
+julia --project=. -t 12 experiments.jl --experiments 3
 ```
 
 Once that completes, start the full run:
 
 ```sh
 # Run all experiments
-julia --project=. -t auto experiments.jl
+julia --project=. -t 12 experiments.jl
 
 # Or only specific experiments (comma-separated)
-julia --project=. -t auto experiments.jl --experiments 1,3,5
+julia --project=. -t 12 experiments.jl --experiments 1,3,5
 ```
 
 Detach with `Ctrl-b` then `d` (the run keeps going); you can now disconnect SSH.

@@ -24,24 +24,28 @@ Alternatively, from the Julia REPL press `]` to enter the package manager and ru
 
 ## Run the experiments
 
-Pass `-t auto` so the parallel experiments (3–5) use all available CPU cores.
+The experiments run several MILP solves in parallel across Julia threads, and
+each solve runs Gurobi with `Threads=8`. So launch Julia with about **cores ÷ 8**
+threads to use the machine fully without oversubscribing — e.g. `-t 12` on a
+96-core machine, `-t 4` on a 32-core one. (Avoid `-t auto`: one Julia thread per
+core × 8 Gurobi threads each heavily oversubscribes.)
 
-Run all experiments:
+Run all experiments (adjust `-t` to your core count ÷ 8):
 
 ```sh
-julia --project=. -t auto experiments.jl
+julia --project=. -t 12 experiments.jl
 ```
 
 Run only specific experiments (comma-separated):
 
 ```sh
-julia --project=. -t auto experiments.jl --experiments 1,3,5
+julia --project=. -t 12 experiments.jl --experiments 1,3,5
 ```
 
 Write outputs (under `data/`, `tables/`, `figs/`) to a different root directory:
 
 ```sh
-julia --project=. -t auto experiments.jl --rootdir path/to/output
+julia --project=. -t 12 experiments.jl --rootdir path/to/output
 ```
 
 Experiments whose output CSV (`data/expN-data.csv`) already exists are skipped,
@@ -49,5 +53,5 @@ so an interrupted run simply resumes where it left off. Pass `--force` to re-run
 them anyway:
 
 ```sh
-julia --project=. -t auto experiments.jl --force
+julia --project=. -t 12 experiments.jl --force
 ```
