@@ -12,7 +12,7 @@
 # Note: does NOT need -t auto; this benchmarks Gurobi's *internal* threads, not
 # Julia threads.
 
-using CSV, DataFrames, JuMP, Gurobi, DataStructures, Dates
+using CSV, DataFrames, JuMP, Gurobi, DataStructures, Dates, PrettyTables
 
 # Pull in the model code (Population type, approx_disjoint_model, helpers).
 # GUROBI_THREADS/MIPGAP get default values from optimisation.jl's fallback; we
@@ -71,11 +71,12 @@ print("Warming up... "); timed_solve(pop, 2, G, K, 1); println("done")
 _, _, _, _, actual_gap = timed_solve(pop, 2, G, K, 1)
 println("Confirmed MIPGap in use: $(actual_gap)\n")
 
-println(rpad("Threads", 9), rpad("Used", 7), rpad("Time", 12), rpad("Objective", 13), "RelGap")
-println("-"^45)
+results = DataFrame(Threads=Int[], Used=Int[], var"Time (s)"=Float64[],
+                    Objective=Float64[], RelGap=Float64[])
 for t in threadlist
     elapsed, obj, gap, used, _ = timed_solve(pop, budget, G, K, t)
     secs = Dates.value(elapsed) / 1000  # ms -> seconds
-    println(rpad(t, 9), rpad(used, 7), rpad("$(round(secs; digits=1)) s", 12),
-            rpad(round(obj; digits=2), 13), round(gap; sigdigits=3))
+    push!(results, (t, round(Int, used), round(secs; digits=1),
+                    round(obj; digits=2), round(gap; sigdigits=3)))
 end
+pretty_table(results)
