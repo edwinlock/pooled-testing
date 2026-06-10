@@ -25,20 +25,33 @@ include("optimisation.jl")
 
 ## HELPERS
 
+# An algorithm must run on the main thread iff it uses MOSEK (via `greedy`'s conic
+# subroutine): MOSEK's Linux aarch64 build aborts when called from a Julia worker
+# thread. Gurobi-based algs (per-thread env) are safe to run in parallel.
+main_thread_only(alg) = alg.fn === greedy
+
+"""
+Run one algorithm on a (population, budget, poolsize) cell and write its welfare,
+error and time into `result`.
+"""
+function run_alg!(result, alg, pop, T, G)
+    start = Dates.now()
+    w, pools, error = alg.fn(pop; T=T, G=G, alg.args...)
+    time = Dates.now() - start
+    result[Symbol("$(alg.name)_welfare")] = w
+    result[Symbol("$(alg.name)_error")] = error
+    result[Symbol("$(alg.name)_time")] = time
+    return result
+end
+
 """
 Solve a single (population, budget, poolsize) cell with every algorithm and
-return the result row as a `Dict`. Each call is independent of every other, so
-this is the unit of work parallelised by `run_experiments`.
+return the result row as a `Dict`.
 """
 function run_cell(algs, i, pop, T, G)
     result = Dict{Symbol, Any}(:budget => T, :population => i, :poolsize => G)
-    for (name, fn, args) in algs
-        start = Dates.now()
-        w, pools, error = fn(pop; T=T, G=G, args...)
-        time = Dates.now() - start
-        result[Symbol("$(name)_welfare")] = w
-        result[Symbol("$(name)_error")] = error
-        result[Symbol("$(name)_time")] = time
+    for alg in algs
+        run_alg!(result, alg, pop, T, G)
     end
     return result
 end
@@ -70,11 +83,30 @@ function run_experiments(algs, populations, budgets, poolsizes; multithread=fals
     # Current cell shown inline in the bar's description (budget, pool size).
     celldesc(T, G) = "Running G=$(G), B=$(T) "
     if multithread
-        # Each thread writes its own index, so no synchronisation is needed.
-        Threads.@threads for k in eachindex(work)
-            i, pop, T, G = work[k]
-            results[k] = run_cell(algs, i, pop, T, G)
-            ProgressMeter.next!(progress; desc=celldesc(T, G))
+        # Split algs: Gurobi ones run in parallel across worker threads; MOSEK ones
+        # (greedy) must run on the main thread (their Linux build aborts otherwise).
+        par_algs = filter(!main_thread_only, algs)
+        serial_algs = filter(main_thread_only, algs)
+        for k in eachindex(work)  # init result dicts so both passes can write into them
+            i, _, T, G = work[k]
+            results[k] = Dict{Symbol, Any}(:budget => T, :population => i, :poolsize => G)
+        end
+        # Pass 1: Gurobi solves in parallel. Each thread writes its own index.
+        if !isempty(par_algs)
+            Threads.@threads for k in eachindex(work)
+                _, pop, T, G = work[k]
+                for alg in par_algs
+                    run_alg!(results[k], alg, pop, T, G)
+                end
+                ProgressMeter.next!(progress; desc=celldesc(T, G))
+            end
+        end
+        # Pass 2: MOSEK solves serially on the main thread.
+        for k in eachindex(work)
+            _, pop, T, G = work[k]
+            for alg in serial_algs
+                run_alg!(results[k], alg, pop, T, G)
+            end
         end
     else
         for k in eachindex(work)
@@ -258,7 +290,9 @@ approx_vs_greedy(K) = [
 
 """
 Run an approx-vs-greedy experiment on the pilot population (experiments 1–2).
-Single population, so timings are kept clean by running single-threaded.
+Runs multithreaded: the MILP (Gurobi) solves for the different budgets run in
+parallel across threads, while the greedy/MOSEK solves run serially on the main
+thread (MOSEK aborts on worker threads). Start Julia with `-t auto`.
 """
 function pilot_experiment(num; rootdir, G, budgets, K, seed, desc)
     println("\nSTARTING EXPERIMENT $(num): $(desc)")
@@ -266,7 +300,7 @@ function pilot_experiment(num; rootdir, G, budgets, K, seed, desc)
     ensure_dirs(rootdir)
     trial_population, _ = extract_population(joinpath(rootdir, "pilotdata.csv"), UTIL_UPPER_BOUND)
     algs = approx_vs_greedy(K)
-    df = run_experiments(algs, [trial_population], budgets, [G])
+    df = run_experiments(algs, [trial_population], budgets, [G]; multithread=true)
     add_comparisons!(df, algs)
     save_results(df, num, rootdir)
     return df
@@ -275,10 +309,9 @@ end
 
 """
 Run an approx-vs-greedy experiment on `reps` synthetic populations of size `n`
-(experiments 3–4). Run single-threaded: these use greedy's MOSEK conic
-subroutine, and MOSEK's Linux aarch64 build aborts when called from a Julia
-worker thread (it only runs safely on the main thread). Welfare/ratio plots are
-written.
+(experiments 3–4). Runs multithreaded: MILP (Gurobi) solves run in parallel
+across threads, while greedy/MOSEK solves run serially on the main thread (MOSEK
+aborts on worker threads). Welfare/ratio plots are written.
 """
 function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
     println("\nSTARTING EXPERIMENT $(num): $(desc)")
@@ -286,7 +319,7 @@ function synthetic_experiment(num; rootdir, n, G, K, reps, seed, desc)
     ensure_dirs(rootdir)
     populations = synthetic_populations(rootdir, n, reps)
     algs = approx_vs_greedy(K)
-    df = run_experiments(algs, populations, SYNTHETIC_BUDGETS, [G])
+    df = run_experiments(algs, populations, SYNTHETIC_BUDGETS, [G]; multithread=true)
     add_comparisons!(df, algs)
     save_results(df, num, rootdir)
     plot_welfares(df, joinpath(rootdir, "figs", "exp$(num)-welfares.pdf"))
