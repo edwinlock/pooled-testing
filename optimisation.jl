@@ -9,7 +9,10 @@ if !isdefined(@__MODULE__, :GUROBI_THREADS)
     const GUROBI_THREADS = 8
 end
 if !isdefined(@__MODULE__, :GUROBI_MIPGAP)
-    const GUROBI_MIPGAP = 0.005
+    # Loose convenience default for standalone use; experiments.jl sets its own
+    # (1e-4). Comparison-grade code should set MIPGap explicitly, since a 0.1%
+    # gap is too loose to resolve the MILP-vs-greedy difference (see log.md).
+    const GUROBI_MIPGAP = 1e-3   # 0.1%
 end
 set_gurobi_params!(m) = set_optimizer_attributes(m,
     "Threads" => GUROBI_THREADS, "MIPGap" => GUROBI_MIPGAP)

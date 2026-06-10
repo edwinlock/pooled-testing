@@ -20,6 +20,8 @@ using CSV, DataFrames, JuMP, Gurobi, DataStructures, Dates
 include("optimisation.jl")
 
 const UTIL_UPPER_BOUND = 50
+const MIPGAP = 1e-4   # paper default; set explicitly so the benchmark never
+                      # depends on optimisation.jl's fallback value
 
 "Load the pilot population with integral utilities (mirrors experiments.jl)."
 function load_pilot(filename)
@@ -41,7 +43,7 @@ function timed_solve(pop, T, G, K, threads)
     T = min(T, sum(n))
     m, _, _ = approx_disjoint_model(q, u, n; T=T, G=G, K=K, verbose=false)
     set_optimizer_attribute(m, "Threads", threads)  # override the global cap
-    set_optimizer_attribute(m, "MIPGap", GUROBI_MIPGAP)
+    set_optimizer_attribute(m, "MIPGap", MIPGAP)     # paper default, set explicitly
     start = now()
     optimize!(m)
     elapsed = now() - start
@@ -54,7 +56,7 @@ threadlist  = length(ARGS) >= 2 ? parse.(Int, split(ARGS[2], ",")) : [1, 8, 16, 
 G, K = 5, 25
 
 pop = load_pilot("pilotdata.csv")
-println("Benchmarking pilot MILP at B=$(budget), G=$(G), K=$(K), MIPGap=$(GUROBI_MIPGAP)")
+println("Benchmarking pilot MILP at B=$(budget), G=$(G), K=$(K), MIPGap=$(MIPGAP)")
 println("Population size: $(length(pop))  |  machine cores: $(Sys.CPU_THREADS)\n")
 
 # Warm up (compile + Gurobi init) on a trivial solve so timings are clean.
