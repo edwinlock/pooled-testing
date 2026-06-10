@@ -42,12 +42,16 @@ function timed_solve(pop, T, G, K, threads)
     q, u, n, _ = cluster2vec(clusters)
     T = min(T, sum(n))
     m, _, _ = approx_disjoint_model(q, u, n; T=T, G=G, K=K, verbose=false)
-    set_optimizer_attribute(m, "Threads", threads)  # override the global cap
-    set_optimizer_attribute(m, "MIPGap", MIPGAP)     # paper default, set explicitly
+    # approx_disjoint_model already called set_gurobi_params! (Threads=GUROBI_THREADS,
+    # MIPGap=fallback). Override both here, then read them back to confirm what
+    # Gurobi will actually use.
+    set_optimizer_attribute(m, "Threads", threads)
+    set_optimizer_attribute(m, "MIPGap", MIPGAP)
+    actual_threads = get_optimizer_attribute(m, "Threads")
     start = now()
     optimize!(m)
     elapsed = now() - start
-    return elapsed, objective_value(m), MOI.get(m, MOI.RelativeGap())
+    return elapsed, objective_value(m), MOI.get(m, MOI.RelativeGap()), actual_threads
 end
 
 # --- Parse args ---
@@ -62,8 +66,10 @@ println("Population size: $(length(pop))  |  machine cores: $(Sys.CPU_THREADS)\n
 # Warm up (compile + Gurobi init) on a trivial solve so timings are clean.
 print("Warming up... "); timed_solve(pop, 2, G, K, 1); println("done\n")
 
-println(rpad("Threads", 10), rpad("Time", 16), rpad("Objective", 16), "RelGap")
+println(rpad("Threads", 10), rpad("Used", 8), rpad("Time (s)", 12), rpad("Objective", 14), "RelGap")
 for t in threadlist
-    elapsed, obj, gap = timed_solve(pop, budget, G, K, t)
-    println(rpad(t, 10), rpad(string(elapsed), 16), rpad(round(obj; digits=2), 16), round(gap; sigdigits=3))
+    elapsed, obj, gap, used = timed_solve(pop, budget, G, K, t)
+    secs = Dates.value(elapsed) / 1000  # ms -> seconds
+    println(rpad(t, 10), rpad(used, 8), rpad(round(secs; digits=1), 12),
+            rpad(round(obj; digits=2), 14), round(gap; sigdigits=3))
 end
