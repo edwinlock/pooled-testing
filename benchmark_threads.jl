@@ -48,10 +48,11 @@ function timed_solve(pop, T, G, K, threads)
     set_optimizer_attribute(m, "Threads", threads)
     set_optimizer_attribute(m, "MIPGap", MIPGAP)
     actual_threads = get_optimizer_attribute(m, "Threads")
+    actual_gap = get_optimizer_attribute(m, "MIPGap")  # confirm the override took
     start = now()
     optimize!(m)
     elapsed = now() - start
-    return elapsed, objective_value(m), MOI.get(m, MOI.RelativeGap()), actual_threads
+    return elapsed, objective_value(m), MOI.get(m, MOI.RelativeGap()), actual_threads, actual_gap
 end
 
 # --- Parse args ---
@@ -64,12 +65,17 @@ println("Benchmarking pilot MILP at B=$(budget), G=$(G), K=$(K), MIPGap=$(MIPGAP
 println("Population size: $(length(pop))  |  machine cores: $(Sys.CPU_THREADS)\n")
 
 # Warm up (compile + Gurobi init) on a trivial solve so timings are clean.
-print("Warming up... "); timed_solve(pop, 2, G, K, 1); println("done\n")
+print("Warming up... "); timed_solve(pop, 2, G, K, 1); println("done")
 
-println(rpad("Threads", 10), rpad("Used", 8), rpad("Time (s)", 12), rpad("Objective", 14), "RelGap")
+# Confirm the actual MIPGap Gurobi will use (the build log can show a stale value).
+_, _, _, _, actual_gap = timed_solve(pop, 2, G, K, 1)
+println("Confirmed MIPGap in use: $(actual_gap)\n")
+
+println(rpad("Threads", 9), rpad("Used", 7), rpad("Time", 12), rpad("Objective", 13), "RelGap")
+println("-"^45)
 for t in threadlist
-    elapsed, obj, gap, used = timed_solve(pop, budget, G, K, t)
+    elapsed, obj, gap, used, _ = timed_solve(pop, budget, G, K, t)
     secs = Dates.value(elapsed) / 1000  # ms -> seconds
-    println(rpad(t, 10), rpad(used, 8), rpad(round(secs; digits=1), 12),
-            rpad(round(obj; digits=2), 14), round(gap; sigdigits=3))
+    println(rpad(t, 9), rpad(used, 7), rpad("$(round(secs; digits=1)) s", 12),
+            rpad(round(obj; digits=2), 13), round(gap; sigdigits=3))
 end
