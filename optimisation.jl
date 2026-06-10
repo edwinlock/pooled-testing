@@ -2,6 +2,18 @@ using JuMP, Gurobi, DataStructures
 
 const Population{T} = Dict{T, Tuple{Float64, Int}} where T  # interpretation: participant ids are mapped to (q, u)
 
+# Apply Gurobi solver settings to a model. GUROBI_THREADS and GUROBI_MIPGAP are
+# normally defined at the top of experiments.jl (before this file is included);
+# fall back to sensible defaults if optimisation.jl is used standalone.
+if !isdefined(@__MODULE__, :GUROBI_THREADS)
+    const GUROBI_THREADS = 8
+end
+if !isdefined(@__MODULE__, :GUROBI_MIPGAP)
+    const GUROBI_MIPGAP = 0.005
+end
+set_gurobi_params!(m) = set_optimizer_attributes(m,
+    "Threads" => GUROBI_THREADS, "MIPGap" => GUROBI_MIPGAP)
+
 # Gurobi environments are not safe to share across concurrent optimizations, so
 # we keep one environment per thread and create them lazily on first use. Model
 # code should call `grb_env()` instead of referencing a shared global.

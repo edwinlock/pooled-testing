@@ -11,6 +11,12 @@
 # Load packages
 using CSV, DataFrames, Statistics, Dates, StatsPlots, Distributions, ProgressMeter, DataStructures, Gurobi, ArgParse, Random
 
+# Gurobi solver settings (used by the MILP models in optimisation.jl).
+# MIPGap: stop each solve once provably within this relative gap of optimal.
+# Threads: cap branch-and-bound threads (MILP parallelises poorly past a few).
+const GUROBI_MIPGAP = 0.005   # 0.5%
+const GUROBI_THREADS = 8
+
 # Include optimisation code
 include("optimisation.jl")
 
@@ -56,7 +62,9 @@ function run_experiments(algs, populations, budgets, poolsizes; multithread=fals
     work = [(i, pop, T, G)
             for (i, pop) in enumerate(populations) for T in budgets for G in poolsizes]
     results = Vector{Dict{Symbol, Any}}(undef, length(work))
-    progress = Progress(length(work); desc="Running experiments ")  # ProgressMeter is thread-safe
+    # showspeed adds per-solve timing (s/it) so each budget's solve time is visible;
+    # the bar also shows elapsed Time: / ETA:. ProgressMeter is thread-safe.
+    progress = Progress(length(work); desc="Running experiments ", showspeed=true)
     # Current cell shown inline in the bar's description (budget, pool size).
     celldesc(T, G) = "Running G=$(G), B=$(T) "
     if multithread

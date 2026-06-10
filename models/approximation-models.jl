@@ -31,8 +31,7 @@ function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 
 	# Create model and set parameters
 	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(grb_env())))
-	# set_optimizer_attribute(m, "Threads", 8)
-	# "Presolve" => 0, "OutputFlag" => 0, "MIPGap" => 0.01, "TimeLimit" => 600
+	set_gurobi_params!(m)  # Threads + MIPGap (see optimisation.jl)
 	!verbose && set_silent(m)
 
 	# Define variables
@@ -220,8 +219,7 @@ function approx_model(q, u; k=1, T, G=5, K=15, verbose=false)
 
 	# Create model and set parameters
 	m = Model(optimizer_with_attributes(() -> Gurobi.Optimizer(grb_env())))
-	# set_optimizer_attribute(m, "Threads", 8)
-	# "Presolve" => 0, "OutputFlag" => 0, "MIPGap" => 0.01, "TimeLimit" => 600
+	set_gurobi_params!(m)  # Threads + MIPGap (see optimisation.jl)
 	!verbose && set_silent(m)
 	
 	@variable(m, x[1:T, 1:C], binary=true)  # test vectors
