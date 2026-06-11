@@ -168,7 +168,7 @@ function parse_commandline(args)
     return parse_args(args, s)
 end
 
-function (@main)(args)
+function main(args)
     parsed = parse_commandline(args)
     rootdir = parsed["rootdir"]
     requested = split(parsed["experiments"], [',', ' ']; keepempty=false)
@@ -190,4 +190,9 @@ function (@main)(args)
         end
     end
     @info "All requested experiments done. Analyse with: julia --project=. analyse.jl"
+end
+
+# Run only when executed as a script (not when included).
+if abspath(PROGRAM_FILE) == @__FILE__
+    main(ARGS)
 end

@@ -139,10 +139,15 @@ function parse_commandline(args)
     return parse_args(args, s)
 end
 
-function (@main)(args)
+function main(args)
     parsed = parse_commandline(args)
     rootdir = parsed["rootdir"]
     for key in strip.(split(parsed["experiments"], [',', ' ']; keepempty=false))
         haskey(ANALYSES, key) ? analyse(rootdir, key) : @warn("Unknown experiment: $(key)")
     end
+end
+
+# Run only when executed as a script (not when included, e.g. by the tests).
+if abspath(PROGRAM_FILE) == @__FILE__
+    main(ARGS)
 end

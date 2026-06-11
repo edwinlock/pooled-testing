@@ -53,7 +53,8 @@ Open (creating if needed) the store and ensure its schema. WAL mode lets a reade
 function open_store(rootdir)
     mkpath(joinpath(rootdir, "data"))
     db = SQLite.DB(store_path(rootdir))
-    DBInterface.execute(db, "PRAGMA journal_mode=WAL;")
+    DBInterface.execute(db, "PRAGMA journal_mode=WAL;")     # concurrent readers while writing
+    DBInterface.execute(db, "PRAGMA busy_timeout=5000;")    # wait, don't error, on a brief lock
     DBInterface.execute(db, """
         CREATE TABLE IF NOT EXISTS populations (
             pop_hash TEXT PRIMARY KEY,
@@ -103,6 +104,7 @@ function record_solve!(db, pop_hash, T, G, alg, welfare, guarantee, time_ms)
 end
 
 "Load `solves` joined with `populations` as a DataFrame, for analysis."
-load_solves(rootdir) = DBInterface.execute(open_store(rootdir),
+load_solves(db::SQLite.DB) = DBInterface.execute(db,
     "SELECT s.*, p.experiment, p.pop_index, p.n
      FROM solves s LEFT JOIN populations p ON s.pop_hash = p.pop_hash") |> DataFrame
+load_solves(rootdir::AbstractString) = load_solves(open_store(rootdir))
