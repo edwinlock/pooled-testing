@@ -3,13 +3,13 @@ using JuMP, Gurobi, DataStructures
 const Population{T} = Dict{T, Tuple{Float64, Int}} where T  # interpretation: participant ids are mapped to (q, u)
 
 # Apply Gurobi solver settings to a model. GUROBI_THREADS and GUROBI_MIPGAP are
-# normally defined at the top of experiments.jl (before this file is included);
+# normally defined at the top of run.jl (before this file is included);
 # fall back to sensible defaults if optimisation.jl is used standalone.
 if !isdefined(@__MODULE__, :GUROBI_THREADS)
     const GUROBI_THREADS = 8
 end
 if !isdefined(@__MODULE__, :GUROBI_MIPGAP)
-    # Loose convenience default for standalone use; experiments.jl sets its own
+    # Loose convenience default for standalone use; run.jl/analyse.jl set their own
     # (1e-4). Comparison-grade code should set MIPGap explicitly, since a 0.1%
     # gap is too loose to resolve the MILP-vs-greedy difference (see log.md).
     const GUROBI_MIPGAP = 1e-3   # 0.1%

@@ -93,7 +93,19 @@
       "Bash(julia --project=. verify_g.jl)",
       "Bash(git commit -q -m 'Add milp_guarantee + exp_domain helpers to study K accuracy/runtime tradeoff *)",
       "Bash(sed -n '510,518p' main-body.tex)",
-      "Bash(awk '/table:experiment2/,/bottomrule/' appendix-6a.tex)"
+      "Bash(awk '/table:experiment2/,/bottomrule/' appendix-6a.tex)",
+      "Bash(julia --project=. /tmp/test_store.jl)",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.add\\(\"DBInterface\"\\)')",
+      "Bash(julia --project=. /tmp/t.jl)",
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"datastore.jl\",String\\)\\); println\\(\"PARSE OK\"\\)')",
+      "Bash(git commit -q -m 'Add SQLite-backed per-solve store \\(datastore.jl\\) *)",
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"run.jl\",String\\)\\); println\\(\"PARSE OK\"\\)')",
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"analyse.jl\",String\\)\\); println\\(\"analyse.jl PARSE OK\"\\)')",
+      "Bash(julia --project=. /tmp/tr.jl)",
+      "Bash(git rm *)",
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"analyse.jl\",String\\)\\); println\\(\"PARSE OK\"\\)')",
+      "Bash(julia --project=. /tmp/tj.jl)",
+      "Bash(git commit -q -m 'Split experiments.jl into run.jl \\(producer\\) + analyse.jl \\(consumer\\) *)"
     ],
     "additionalDirectories": [
       "/Users/k2585143/github/PooledTesting.jl/src",
