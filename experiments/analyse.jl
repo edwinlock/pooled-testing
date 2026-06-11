@@ -11,6 +11,9 @@ using PooledTesting, CSV, DataFrames, Statistics, StatsPlots, PrettyTables, ArgP
 
 const ROOT = @__DIR__   # the data/ store and outputs live alongside this script
 
+# Same experiment parameters as run.jl (honours POOLED_CONSTANTS).
+include(abspath(get(ENV, "POOLED_CONSTANTS", joinpath(@__DIR__, "constants.jl"))))
+
 
 ## RESHAPING THE STORE
 
@@ -95,13 +98,14 @@ end
 
 ## DRIVING THE ANALYSIS PER EXPERIMENT
 
-# (algorithms, whether to make welfare/ratio plots, whether to make a scatter)
+# (algorithms, whether to make welfare/ratio plots, whether to make a scatter).
+# Budgets (used for plot xticks) come from the shared experiment constants.
 const ANALYSES = Dict(
-    "1" => (algs=["approx","greedy"], plots=false, scatter=false, budgets=2:4:30),
-    "2" => (algs=["approx","greedy"], plots=false, scatter=false, budgets=2:4:30),
-    "3" => (algs=["approx","greedy"], plots=true,  scatter=false, budgets=2:2:12),
-    "4" => (algs=["approx","greedy"], plots=true,  scatter=false, budgets=2:2:12),
-    "5" => (algs=["two_overlap","disjoint"], plots=true, scatter=true, budgets=2:5),
+    "1" => (algs=["approx","greedy"], plots=false, scatter=false, budgets=PILOT_BUDGETS),
+    "2" => (algs=["approx","greedy"], plots=false, scatter=false, budgets=PILOT_BUDGETS),
+    "3" => (algs=["approx","greedy"], plots=true,  scatter=false, budgets=SYNTHETIC_BUDGETS),
+    "4" => (algs=["approx","greedy"], plots=true,  scatter=false, budgets=SYNTHETIC_BUDGETS),
+    "5" => (algs=["two_overlap","disjoint"], plots=true, scatter=true, budgets=[2,3,4,5]),
 )
 
 function analyse(rootdir, key)

@@ -10,7 +10,9 @@
 
 using PooledTesting, CSV, DataFrames, Distributions, Random, ArgParse
 
-include("constants.jl")
+# Experiment parameters. Point POOLED_CONSTANTS at another file (e.g.
+# constants_test.jl) to run the whole pipeline quickly with tiny parameters.
+include(abspath(get(ENV, "POOLED_CONSTANTS", joinpath(@__DIR__, "constants.jl"))))
 
 const ROOT = @__DIR__   # pilotdata.csv and the data/ store live alongside this script
 
