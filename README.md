@@ -17,12 +17,16 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 Then always run with `--project=.` so Julia uses this environment rather than your global one:
 
 ```sh
-julia --project=. experiments.jl
+julia --project=. run.jl
 ```
 
 Alternatively, from the Julia REPL press `]` to enter the package manager and run `activate .` followed by `instantiate`. In VS Code, the Julia extension activates the project automatically when you open this folder.
 
 ## Run the experiments
+
+Running and analysis are separate. `run.jl` solves every cell and writes each
+result to a SQLite store (`data/solves.db`); `analyse.jl` reads that store and
+produces summary tables and plots — and can be run while `run.jl` is still going.
 
 The experiments run several MILP solves in parallel across Julia threads, and
 each solve runs Gurobi with `Threads=8`. So launch Julia with about **cores ÷ 8**
@@ -33,25 +37,22 @@ core × 8 Gurobi threads each heavily oversubscribes.)
 Run all experiments (adjust `-t` to your core count ÷ 8):
 
 ```sh
-julia --project=. -t 8 experiments.jl
+julia --project=. -t 8 run.jl
 ```
 
 Run only specific experiments (comma-separated):
 
 ```sh
-julia --project=. -t 8 experiments.jl --experiments 1,3,5
+julia --project=. -t 8 run.jl --experiments 1,3,5
 ```
 
-Write outputs (under `data/`, `tables/`, `figs/`) to a different root directory:
+Solves already in the store are skipped, so an interrupted or reclaimed run
+simply resumes where it left off — just re-run the same command.
+
+Analyse the results (any time, including mid-run) — writes `data/expN-data.csv`,
+`tables/expN-summary.tex` and `figs/expN-*.pdf`:
 
 ```sh
-julia --project=. -t 8 experiments.jl --rootdir path/to/output
-```
-
-Experiments whose output CSV (`data/expN-data.csv`) already exists are skipped,
-so an interrupted run simply resumes where it left off. Pass `--force` to re-run
-them anyway:
-
-```sh
-julia --project=. -t 8 experiments.jl --force
+julia --project=. analyse.jl
+julia --project=. analyse.jl --experiments 3   # a subset
 ```

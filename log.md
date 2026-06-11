@@ -2,6 +2,10 @@
 
 Concise running log of experiment runs and key changes. Newest first.
 
+## 2026-06-11
+- Split experiments.jl → run.jl (solve → SQLite store) + analyse.jl (store → tables/plots). analyse can run mid-run (WAL). Per-solve resume replaces the old per-experiment CSV guard; --force removed.
+- SQLite store (datastore.jl): populations + solves tables, content-hashed populations, solves reused across reruns/experiments. K=15 for all experiments (guarantee helper milp_guarantee added).
+
 ## 2026-06-10
 - Interrupted overnight run: exp 1 (G=5) reached B=22 in ~8h — ~6× slower than paper's Table 1; B=26/30 still ahead (paper ~3.4h/~19h) → not viable as-is.
 - Ruled out causes: rounding/clamp change affects 0 of 130 pilot people; MILP formulation gap (`T*ε`, K-based) unchanged since 2023; Gurobi default MIPGap (1e-4) unchanged 2023→13.0.1.

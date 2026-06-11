@@ -11,9 +11,10 @@ so launch Julia with about cores÷8 threads (see step 4). `c8g.48xlarge`
 
 Spot instances cost ~60–90% less than on-demand, in exchange for AWS being able
 to reclaim them with a 2-minute warning. This job is well suited to Spot because
-it resumes cleanly: each experiment writes `data/expN-data.csv` on completion,
-and re-running skips any experiment whose CSV already exists (pass `--force` to
-re-run regardless). So an interrupted run just needs to be restarted.
+it resumes cleanly: every solve is written to the SQLite store
+(`data/solves.db`) as it completes, and re-running skips any solve already in the
+store. So an interrupted run just needs to be restarted with the same command,
+losing at most the solves that were in flight.
 
 All commands below use the Ohio region (`us-east-2`, typically the cheapest).
 
@@ -260,21 +261,28 @@ First validate that the parallel solves run cleanly on this many-core machine by
 running just experiment 3 (the multithreaded, MOSEK-heavy one):
 
 ```sh
-julia --project=. -t 8 experiments.jl --experiments 3
+julia --project=. -t 8 run.jl --experiments 3
 ```
 
 Once that completes, start the full run:
 
 ```sh
 # Run all experiments
-julia --project=. -t 8 experiments.jl
+julia --project=. -t 8 run.jl
 
 # Or only specific experiments (comma-separated)
-julia --project=. -t 8 experiments.jl --experiments 1,3,5
+julia --project=. -t 8 run.jl --experiments 1,3,5
 ```
 
 Detach with `Ctrl-b` then `d` (the run keeps going); you can now disconnect SSH.
 Reattach later with `tmux attach -t experiments`, or list sessions with `tmux ls`.
+
+Analyse the results at any time (including while a run is still going) to produce
+the summary tables and plots:
+
+```sh
+julia --project=. analyse.jl
+```
 
 ## 5. Sync results back up to S3
 

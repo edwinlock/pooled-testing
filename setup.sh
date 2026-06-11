@@ -106,5 +106,6 @@ echo "then start the experiments inside tmux, e.g.:"
 echo
 echo "    tmux new -s experiments"
 echo "    cd $REPO_DIR"
-echo "    julia --project=. -t auto experiments.jl --experiments 3   # validate first"
-echo "    julia --project=. -t auto experiments.jl                   # full run"
+echo "    julia --project=. -t \$((\$(nproc)/8)) run.jl --experiments 3   # validate first"
+echo "    julia --project=. -t \$((\$(nproc)/8)) run.jl                   # full run"
+echo "    julia --project=. analyse.jl                                  # tables + plots"
