@@ -1,5 +1,5 @@
 @testset "analyse: reshaping the store" begin
-    include(joinpath(REPO, "analyse.jl"))   # brings in experiment_frame, summary_table
+    include(joinpath(@__DIR__, "..", "experiments", "analyse.jl"))  # experiment_frame, summary_table
 
     # Build a small store: 2 populations × 2 budgets × {approx, greedy}.
     rootdir = mktempdir()

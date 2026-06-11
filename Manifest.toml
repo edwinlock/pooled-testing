@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "5b1acea10b7582d105afc676e12cda524cea7a82"
+project_hash = "62d1173f7a00270561d52780e3123c64bc07d3bc"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1024,6 +1024,12 @@ deps = ["DataAPI", "Future"]
 git-tree-sha1 = "36d8b4b899628fb92c2749eb488d884a926614d3"
 uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
 version = "1.4.3"
+
+[[deps.PooledTesting]]
+deps = ["ArgParse", "CSV", "Combinatorics", "DBInterface", "DataFrames", "DataStructures", "Dates", "Distributions", "Gurobi", "JuMP", "MathOptInterface", "Mosek", "MosekTools", "PrettyTables", "ProgressMeter", "Random", "Roots", "SQLite", "Statistics", "StatsPlots", "Test"]
+path = "."
+uuid = "61fd0373-c1de-41f5-b580-da49c8739996"
+version = "0.1.0"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]

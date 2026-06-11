@@ -7,10 +7,9 @@
 #
 # Output: data/expN-data.csv, tables/expN-summary.tex, figs/expN-*.pdf
 
-using CSV, DataFrames, Statistics, Dates, StatsPlots, PrettyTables, ArgParse, SQLite, DBInterface, SHA, Pkg
+using PooledTesting, CSV, DataFrames, Statistics, StatsPlots, PrettyTables, ArgParse
 
-const GUROBI_MIPGAP = 1e-4  # only needed so datastore.jl's param_key is consistent
-include("datastore.jl")
+const ROOT = @__DIR__   # the data/ store and outputs live alongside this script
 
 
 ## RESHAPING THE STORE
@@ -134,7 +133,7 @@ function parse_commandline(args)
             default = join(sort(collect(keys(ANALYSES))), ",")
         "--rootdir"
             arg_type = String
-            default = "."
+            default = ROOT
     end
     return parse_args(args, s)
 end

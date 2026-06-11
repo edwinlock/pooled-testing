@@ -1,4 +1,4 @@
-using MosekTools, MathOptInterface
+# (MosekTools, MathOptInterface provided by the PooledTesting module)
 const MOI = MathOptInterface
 
 

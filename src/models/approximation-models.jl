@@ -1,4 +1,4 @@
-using Roots, Combinatorics
+# (Roots, Combinatorics provided by the PooledTesting module)
 
 """
 Build cluster-based MILP model for Gurobi to solve. Finds an approximately

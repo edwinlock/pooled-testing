@@ -14,7 +14,7 @@
 # SQLite serialises writes and commits atomically, so the store stays consistent
 # under the parallel solve loop and survives a process kill mid-write.
 
-using SQLite, DBInterface, DataFrames, SHA, Dates, Pkg
+# (SQLite, DBInterface, DataFrames, SHA, Dates, Pkg are `using`-ed by the module.)
 
 # Provenance captured once per process. Set EC2_INSTANCE_TYPE in the environment
 # to record which machine produced a solve.
@@ -44,7 +44,7 @@ Canonical string of the solve-affecting parameters of an algorithm: its own args
 MIPGap. Two solves with the same params are interchangeable.
 """
 param_key(alg) = join(["$p=$v" for (p, v) in sort(collect(alg.args)) if p ∉ NON_SOLVE_ARGS] ∪
-                      ["mipgap=$GUROBI_MIPGAP"], ";")
+                      ["mipgap=$(GUROBI_MIPGAP[])"], ";")
 
 """
 Open (creating if needed) the store and ensure its schema. WAL mode lets a reader

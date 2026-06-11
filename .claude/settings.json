@@ -105,7 +105,21 @@
       "Bash(git rm *)",
       "Bash(julia -e 'Meta.parseall\\(read\\(\"analyse.jl\",String\\)\\); println\\(\"PARSE OK\"\\)')",
       "Bash(julia --project=. /tmp/tj.jl)",
-      "Bash(git commit -q -m 'Split experiments.jl into run.jl \\(producer\\) + analyse.jl \\(consumer\\) *)"
+      "Bash(git commit -q -m 'Split experiments.jl into run.jl \\(producer\\) + analyse.jl \\(consumer\\) *)",
+      "Bash(git commit -q -m 'Docs: point run.jl/analyse.jl, drop --force/CSV-guard language *)",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.add\\(\"Test\"\\)')",
+      "Bash(julia --project=. test/runtests.jl)",
+      "Bash(git commit -q -m 'Add test suite \\(99 tests\\); script-guard main; load_solves\\(db\\) overload *)",
+      "Bash(git mv *)",
+      "Bash(julia -e 'using UUIDs; println\\(uuid4\\(\\)\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; println\\(\"MODULE LOADS OK\"\\); println\\(\"exports: greedy=\", isdefined\\(PooledTesting,:greedy\\), \" welfare=\", isdefined\\(PooledTesting,:welfare\\), \" open_store=\", isdefined\\(PooledTesting,:open_store\\), \" milp_guarantee=\", isdefined\\(PooledTesting,:milp_guarantee\\)\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting')",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.add\\([\"SHA\",\"Pkg\"]\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; println\\(\"greedy=\", isdefined\\(PooledTesting,:greedy\\), \" welfare=\", isdefined\\(PooledTesting,:welfare\\), \" milp_guarantee=\", isdefined\\(PooledTesting,:milp_guarantee\\), \" open_store=\", isdefined\\(PooledTesting,:open_store\\), \" configure_gurobi!=\", isdefined\\(PooledTesting,:configure_gurobi!\\)\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; println\\(\"OK: run_experiments=\", isdefined\\(PooledTesting,:run_experiments\\)\\)')",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.test\\(\\)')",
+      "Bash(julia --project=. -e 'include\\(\"experiments/run.jl\"\\); println\\(\"run.jl loads, EXPERIMENT_SPECS has \", length\\(EXPERIMENT_SPECS\\), \" experiments\"\\)')",
+      "Bash(julia --project=. -e 'include\\(\"experiments/analyse.jl\"\\); println\\(\"analyse.jl loads, ANALYSES has \", length\\(ANALYSES\\)\\)')"
     ],
     "additionalDirectories": [
       "/Users/k2585143/github/PooledTesting.jl/src",

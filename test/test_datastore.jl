@@ -15,7 +15,7 @@
         @test param_key(alg(:approx; K=15, verbose=false)) ==
               param_key(alg(:approx; K=15, verbose=true))   # verbose excluded
         @test param_key(alg(:approx; K=15)) != param_key(alg(:approx; K=20))
-        @test occursin("mipgap=$(GUROBI_MIPGAP)", param_key(alg(:greedy)))
+        @test occursin("mipgap=$(GUROBI_MIPGAP[])", param_key(alg(:greedy)))
     end
 
     @testset "record + retrieve + idempotency" begin
