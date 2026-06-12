@@ -30,6 +30,19 @@
             @test welfare(pools, pop) ≈ w atol=1e-6
         end
 
+        @testset "approximate with warm start and accuracy budget" begin
+            _, start, _ = greedy(pop; T=2, G=3)
+            accuracy = 0.002
+            target = accuracy * welfare(start, pop)
+            w, pools, err = approximate(pop; T=2, G=3, accuracy=accuracy, start=start)
+            @test w > 0
+            @test err ≥ 0
+            @test err ≈ target atol=1e-8
+            @test welfare(pools, pop) ≈ w atol=1e-6
+            # accuracy without a candidate solution must be rejected
+            @test_throws ArgumentError approximate(pop; T=2, G=3, accuracy=accuracy)
+        end
+
         @testset "approximate ≈ exact within the guarantee" begin
             wa, _, err = approximate(pop; T=2, G=3, K=25)
             we, _, _   = exact(pop; k=1, T=2, G=3)
@@ -38,10 +51,10 @@
             @test wa ≤ we + err + 1e-6
         end
 
-        @testset "empty population returns the 3-tuple contract" begin
+        @testset "empty population returns the solve-result contract" begin
             empty_pop = Population{Int}(1 => (0.0, 0))     # removed by remove_zeros!
-            @test approximate(empty_pop; T=1, G=2) == (0.0, [], 0.0)
-            @test exact(empty_pop; k=1, T=1, G=2) == (0.0, [], 0.0)
+            @test approximate(empty_pop; T=1, G=2) == (0.0, [], 0.0, 0.0)
+            @test exact(empty_pop; k=1, T=1, G=2) == (0.0, [], 0.0, 0.0)
         end
     end
 end

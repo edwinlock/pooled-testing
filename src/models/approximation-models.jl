@@ -37,6 +37,46 @@ function milp_guarantee(q, u; T, G=5, K=15)
     return T*ε
 end
 
+"""
+    accuracy_params(q, u; T, G=5, target, split=0.7, Kmax=200)
+
+Benchmarks (pilot population, B=18, 0.2% budget) show solve time is flat for
+splits 0.6-0.8 but degrades sharply outside: split=0.5 inflates K, and
+split=0.9 starves K so much that the weakened LP relaxation blew up the node
+count 40x. Hence the 0.7 default.
+
+Split a total additive error budget `target` (in welfare units) between the
+two error sources of the disjoint MILP: the piecewise-linear formulation error
+`T*ε(K)` and the solver's absolute MIP gap. Returns `(K, mipgap_abs)` where `K`
+is the smallest segment count with `T*ε(K) <= split*target` and `mipgap_abs`
+is the remaining budget, to be passed to Gurobi as `MIPGapAbs` (with the
+relative `MIPGap` set to 0 so only the absolute criterion binds).
+
+For a relative target, scale by any lower bound on the optimal welfare, e.g.
+the greedy welfare: `accuracy_params(q, u; T, G, target=0.001*greedy_welfare)`.
+
+`ε(K)` shrinks like `1/K²`, so each halving of `target` costs about `√2` in
+model size; if even `Kmax` segments cannot meet `split*target`, a warning is
+issued and the whole residual budget goes to the solver gap.
+"""
+function accuracy_params(q, u; T, G=5, target, split=0.7, Kmax=200)
+	@assert target > 0 "Error budget must be positive."
+	@assert 0 < split < 1 "split must lie strictly between 0 and 1."
+	A, B = exp_domain(q, u, G)
+	err(K) = T * upper_bounds(A, B, K)[4]
+	budget = split * target
+	if err(Kmax) > budget
+		@warn "Formulation error $(err(Kmax)) at Kmax=$Kmax exceeds its budget $(budget)."
+		return Kmax, max(target - err(Kmax), 0.0)
+	end
+	lo, hi = 1, Kmax
+	while lo < hi  # binary search: ε(K) is decreasing in K
+		mid = (lo + hi) ÷ 2
+		err(mid) <= budget ? hi = mid : lo = mid + 1
+	end
+	return lo, target - err(lo)
+end
+
 function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 	# Verify that input is consistent
 	@assert length(u) == length(q) == length(n) "Input vectors have different lengths."
@@ -99,6 +139,26 @@ function approx_disjoint_model(q, u, n; T, G=5, K=15, verbose=false)
 	# Return model
 	return m, x, T*ε
 end
+
+# Formulation experiments (June 2026; harness in experiments/benchmark_approx.jl,
+# results in experiments/approx-benchmark/summary.csv). All of the following were
+# benchmarked against `approx_disjoint_model` on the pilot population and
+# REJECTED — only the greedy warm start survived (now the default in
+# `approximate`, ~1.8x faster at B=18):
+# - partial warm start (x only): slower than no start — Gurobi has to complete
+#   the remaining variables itself.
+# - symmetry breaking z[t] >= z[t+1]: up to 18x slower; it fights Gurobi's own
+#   symmetry detection, and MIP starts must be sorted to satisfy it.
+# - explicit bounds on w/l/y/z: no effect — presolve derives them from the
+#   defining equalities anyway.
+# - zind columns restricted to reachable utility sums: smaller model, no
+#   measurable speedup.
+# - replacing the zind binaries with tangent cuts on the concave log
+#   (y[t] <= log k + (z[t]-k)/k): 1.8x faster at B=14 but 1.6x slower at B=18 —
+#   the tangent envelope weakens the LP root bound between integers.
+# - secant cuts (chords through consecutive (k, log k), whose envelope is
+#   LP-equivalent to the zind hull): still much slower at B=18, so Gurobi
+#   evidently uses the zind binaries productively for branching/cuts.
 
 
 """

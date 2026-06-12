@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "cdf8214a171955d9f8803f1c74b7e0c0983711c2"
+project_hash = "9ca848a44edf7a5a9372fa22d18c08bee2f1fcd2"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -506,15 +506,15 @@ version = "1.0.2"
 
 [[deps.Gurobi]]
 deps = ["Gurobi_jll", "Libdl", "MathOptInterface", "PrecompileTools"]
-git-tree-sha1 = "5f5beefaf8b43dbd76cb4e61f854ed54c40dcd7e"
+git-tree-sha1 = "0c937687e3f5812ecdba2b9986418cac7a873874"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
-version = "1.7.4"
+version = "1.9.2"
 
 [[deps.Gurobi_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "62862ec8309813a9f115e57996c36d5a2824ef87"
+git-tree-sha1 = "54216ec971a0ec855cab4d0d96541c37fbf46c97"
 uuid = "c018c7e6-a5b0-4aea-8f80-9c1ef9991411"
-version = "12.0.1"
+version = "13.0.2"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "PrecompileTools", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
@@ -1026,7 +1026,7 @@ uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
 version = "1.4.3"
 
 [[deps.PooledTesting]]
-deps = ["ArgParse", "CSV", "Combinatorics", "DBInterface", "DataFrames", "DataStructures", "Dates", "Distributions", "Gurobi", "JuMP", "MathOptInterface", "Mosek", "MosekTools", "Pkg", "PrettyTables", "ProgressMeter", "Random", "Roots", "SHA", "SQLite", "Statistics", "StatsPlots"]
+deps = ["ArgParse", "CSV", "Combinatorics", "DBInterface", "DataFrames", "DataStructures", "Dates", "Distributions", "Gurobi", "JuMP", "MathOptInterface", "Mosek", "MosekTools", "Pkg", "PrecompileTools", "PrettyTables", "ProgressMeter", "Random", "Roots", "SHA", "SQLite", "Statistics", "StatsPlots"]
 path = "."
 uuid = "61fd0373-c1de-41f5-b580-da49c8739996"
 version = "0.1.0"

@@ -2,11 +2,10 @@
 #
 # Two tables:
 #   * `populations` — one row per distinct population, keyed by a content hash of
-#     its (q, u) data. Records its size, the experiment and seed it came from, and
-#     the data itself, so any population is fully recoverable.
-#   * `solves` — one row per (population, budget, poolsize, algorithm, params)
-#     solve. Keyed independently of the experiment, so a solve is *reused* whenever
-#     the same population/cell/params recur — across reruns and across experiments.
+#     its (q, u) data.
+#   * `solves` — one row per experiment solve request. Including `experiment` in
+#     the key keeps analysis simple and avoids inferring experiment membership
+#     from reusable population hashes.
 #
 # This gives resumability finer than the per-experiment guard (an interrupted run
 # loses at most the in-flight solves) and live analysis (`analyse.jl` can query
@@ -39,12 +38,19 @@ population was generated. Hashes the (q, u) pairs in canonical (sorted) order.
 population_hash(pop) = bytes2hex(sha1(string(sort([(float(v[1]), Int(v[2])) for v in values(pop)]))))[1:16]
 
 """
-Canonical string of the solve-affecting parameters of an algorithm: its own args
-(e.g. K for the MILP, k for overlap models, minus cosmetic ones) plus the global
-MIPGap. Two solves with the same params are interchangeable.
+Canonical string of the solve-affecting parameters of an algorithm. For Gurobi
+algorithms this includes the global Gurobi settings; for greedy it does not.
 """
-param_key(alg) = join(["$p=$v" for (p, v) in sort(collect(alg.args)) if p ∉ NON_SOLVE_ARGS] ∪
-                      ["mipgap=$(GUROBI_MIPGAP[])"], ";")
+uses_gurobi(alg) = String(alg.name) != "greedy"
+function param_key(alg)
+    parts = ["$p=$v" for (p, v) in sort(collect(alg.args)) if p ∉ NON_SOLVE_ARGS]
+    if uses_gurobi(alg)
+        append!(parts, ["mipgap=$(GUROBI_MIPGAP[])"])
+        append!(parts, ["gurobi:$p=$v" for (p, v) in sort(collect(GUROBI_EXTRA_PARAMS[]))])
+        GUROBI_PARAM_FILE[] === nothing || push!(parts, "gurobi_param_file=$(GUROBI_PARAM_FILE[])")
+    end
+    return join(parts, ";")
+end
 
 """
 Open (creating if needed) the store and ensure its schema. WAL mode lets a reader
@@ -58,53 +64,53 @@ function open_store(rootdir)
     DBInterface.execute(db, """
         CREATE TABLE IF NOT EXISTS populations (
             pop_hash TEXT PRIMARY KEY,
-            experiment INTEGER, pop_index INTEGER, n INTEGER,
+            n INTEGER,
             q TEXT, u TEXT
         );""")
     DBInterface.execute(db, """
         CREATE TABLE IF NOT EXISTS solves (
+            experiment INTEGER, pop_index INTEGER,
             pop_hash TEXT, budget INTEGER, poolsize INTEGER, alg TEXT, params TEXT,
-            welfare REAL, guarantee REAL, time_ms INTEGER,
+            welfare REAL, guarantee REAL, guarantee_post REAL, time_ms INTEGER,
             instance_type TEXT, gurobi_version TEXT, timestamp TEXT,
-            PRIMARY KEY (pop_hash, budget, poolsize, alg, params)
+            PRIMARY KEY (experiment, pop_index, pop_hash, budget, poolsize, alg, params)
         );""")
     return db
 end
 
 "Record a population's metadata (idempotent on its hash). Returns the hash."
-function record_population!(db, pop; experiment, pop_index)
+function record_population!(db, pop)
     h = population_hash(pop)
     q = join((v[1] for v in values(pop)), ",")
     u = join((v[2] for v in values(pop)), ",")
     DBInterface.execute(db, """
-        INSERT OR IGNORE INTO populations (pop_hash, experiment, pop_index, n, q, u)
-        VALUES (?,?,?,?,?,?);""", (h, experiment, pop_index, length(pop), q, u))
+        INSERT OR IGNORE INTO populations (pop_hash, n, q, u)
+        VALUES (?,?,?,?);""", (h, length(pop), q, u))
     return h
 end
 
 """
-Set of solve keys `(pop_hash, budget, poolsize, alg, params)` already stored, so a
-run can skip work already done.
+Set of solve keys already stored, so a run can skip work already done.
 """
 function solved_keys(db)
-    rows = DBInterface.execute(db, "SELECT pop_hash, budget, poolsize, alg, params FROM solves") |> DataFrame
-    return Set((r.pop_hash, r.budget, r.poolsize, r.alg, r.params) for r in eachrow(rows))
+    rows = DBInterface.execute(db, "SELECT experiment, pop_index, pop_hash, budget, poolsize, alg, params FROM solves") |> DataFrame
+    return Set((r.experiment, r.pop_index, r.pop_hash, r.budget, r.poolsize, r.alg, r.params) for r in eachrow(rows))
 end
 
 "Record one completed solve (atomic, idempotent on its key)."
-function record_solve!(db, pop_hash, T, G, alg, welfare, guarantee, time_ms)
+function record_solve!(db, experiment, pop_index, pop_hash, T, G, alg, welfare, guarantee, guarantee_post, time_ms)
     DBInterface.execute(db, """
         INSERT OR REPLACE INTO solves
-        (pop_hash, budget, poolsize, alg, params, welfare, guarantee, time_ms,
-         instance_type, gurobi_version, timestamp)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?);""",
-        (pop_hash, T, G, String(alg.name), param_key(alg), welfare, guarantee,
+        (experiment, pop_index, pop_hash, budget, poolsize, alg, params, welfare, guarantee, guarantee_post,
+         time_ms, instance_type, gurobi_version, timestamp)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);""",
+        (experiment, pop_index, pop_hash, T, G, String(alg.name), param_key(alg), welfare, guarantee, guarantee_post,
          Int(round(time_ms)), INSTANCE_TYPE, GUROBI_VERSION, string(Dates.now())))
     return nothing
 end
 
 "Load `solves` joined with `populations` as a DataFrame, for analysis."
 load_solves(db::SQLite.DB) = DBInterface.execute(db,
-    "SELECT s.*, p.experiment, p.pop_index, p.n
+    "SELECT s.*, p.n
      FROM solves s LEFT JOIN populations p ON s.pop_hash = p.pop_hash") |> DataFrame
 load_solves(rootdir::AbstractString) = load_solves(open_store(rootdir))

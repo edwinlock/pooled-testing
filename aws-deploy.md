@@ -4,7 +4,7 @@
 `c8g.24xlarge` (96 vCPUs) or `c8g.16xlarge` (64 vCPUs). These match the ARM
 Julia/Gurobi/MOSEK builds downloaded below. Pick the size to fit the parallel
 experiments: experiments 3–5 run their independent solves across Julia threads,
-so launch Julia with about cores÷8 threads (see step 4). `c8g.48xlarge`
+so launch Julia with about cores÷8 threads (see step 5). `c8g.48xlarge`
 (192 vCPUs) is the largest, but is only worth it if you saturate it.
 
 ## Launching on a Spot Instance (cheaper)
@@ -183,10 +183,13 @@ aws ec2 describe-spot-price-history --region us-east-2 \
 
 Then connect and set up the instance via the numbered steps below.
 
-Results are persisted to S3 (steps 3 and 5 below) so they survive a termination:
-the output directories `data/`, `tables/` and `figs/` are synced to the bucket.
-The repository itself is not persisted (it is cloned from git); `data/` is what
-the resume logic reads, `tables/` and `figs/` are the paper outputs. On-demand
+Results are persisted to S3 (steps 3 and 6 below) so they survive a termination:
+the output directories `experiments/data/`, `experiments/tables/`,
+`experiments/figs/` and, if you run tuning, `experiments/gurobi-tuning/` are
+synced to the bucket. The repository itself is not persisted (it is cloned from
+git); `experiments/data/` is what the resume logic reads, `experiments/tables/`
+and `experiments/figs/` are the paper outputs, and `experiments/gurobi-tuning/`
+stores Gurobi `.prm`, `.mps`, tuning log and summary artifacts. On-demand
 instances are not reclaimed, so syncing is optional there but still guards
 against accidental termination or a crash.
 
@@ -233,10 +236,64 @@ run, when the bucket is empty):
 
 ```sh
 cd pooled-testing
-for d in data tables figs; do aws s3 sync s3://pooled-testing-bucket/pooled-testing/$d $d; done
+for d in experiments/data experiments/tables experiments/figs experiments/gurobi-tuning; do
+  aws s3 sync s3://pooled-testing-bucket/pooled-testing/$d $d
+done
 ```
 
-## 4. Run experiments inside `tmux`
+## 4. Tune Gurobi on the instance (optional but recommended)
+
+The project uses Gurobi 13 via the Julia environment and the setup script also
+downloads Gurobi 13 for the command-line tools. Gurobi tuning is partly
+hardware-specific, so the best `.prm` file for a many-core Graviton instance may
+not match the best local `.prm` from an Apple laptop. If you have time, tune on
+the instance before starting the long experiment run.
+
+Run one shared-profile tuning job inside its own tmux session so it survives SSH
+disconnects:
+
+```sh
+tmux new -s gurobi-tune
+cd pooled-testing
+julia --project=. experiments/tune_gurobi.jl \
+  --budgets 18,22,30 \
+  --multi-model \
+  --time-limit 2700 \
+  --tune-time-limit 28800 \
+  --baseline-runs 1 \
+  --validate-runs 2
+```
+
+This tunes one `.prm` profile across `B=18`, `B=22` and `B=30`, capped at eight
+hours total (`TuneTimeLimit=28800`). Each trial/model gets at most 45 minutes
+(`TimeLimit=2700`), so `B=30` does not need to solve to optimality during
+tuning. Defaults remain `G=5`, `K=15`, `Threads=8` and `MIPGap=1e-4`.
+Artifacts are written to `experiments/gurobi-tuning/`; at the end the script
+prints the mean baseline runtime, mean tuned validation runtime, seconds saved,
+percentage saved and speedup for each budget. If the tuned validation is not
+clearly better, keep using the default solver settings for the paper runs.
+
+To validate an existing tuned parameter file without re-tuning, sync
+`experiments/gurobi-tuning/` down from S3 first, then run:
+
+```sh
+julia --project=. experiments/tune_gurobi.jl \
+  --budgets 18,22,30 \
+  --multi-model \
+  --time-limit 2700 \
+  --baseline-runs 1 \
+  --skip-tune \
+  --validate-runs 2
+```
+
+The script applies the tuned `.prm` only to its validation solves. The main
+experiment runner still uses the paper-default Gurobi settings unless you
+explicitly wire a tuned `param_file` into a run.
+
+Detach with `Ctrl-b` then `d`; reattach later with
+`tmux attach -t gurobi-tune`.
+
+## 5. Run experiments inside `tmux`
 
 Running inside `tmux` keeps the experiments alive if your SSH connection drops —
 otherwise the run is tied to your SSH session and is killed on disconnect
@@ -261,17 +318,17 @@ First validate that the parallel solves run cleanly on this many-core machine by
 running just experiment 3 (the multithreaded, MOSEK-heavy one):
 
 ```sh
-julia --project=. -t 8 run.jl --experiments 3
+julia --project=. -t 8 experiments/run.jl --experiments 3
 ```
 
 Once that completes, start the full run:
 
 ```sh
 # Run all experiments
-julia --project=. -t 8 run.jl
+julia --project=. -t 8 experiments/run.jl
 
 # Or only specific experiments (comma-separated)
-julia --project=. -t 8 run.jl --experiments 1,3,5
+julia --project=. -t 8 experiments/run.jl --experiments 1,3,5
 ```
 
 Detach with `Ctrl-b` then `d` (the run keeps going); you can now disconnect SSH.
@@ -281,10 +338,10 @@ Analyse the results at any time (including while a run is still going) to produc
 the summary tables and plots:
 
 ```sh
-julia --project=. analyse.jl
+julia --project=. experiments/analyse.jl
 ```
 
-## 5. Sync results back up to S3
+## 6. Sync results back up to S3
 
 While the experiments run, sync the outputs **up** periodically so an
 interruption never costs more than one interval. Run this in a separate tmux
@@ -293,7 +350,9 @@ window (`Ctrl-b c`):
 ```sh
 cd pooled-testing
 while true; do
-  for d in data tables figs; do aws s3 sync $d s3://pooled-testing-bucket/pooled-testing/$d; done
+  for d in experiments/data experiments/tables experiments/figs experiments/gurobi-tuning; do
+    aws s3 sync $d s3://pooled-testing-bucket/pooled-testing/$d
+  done
   sleep 600   # every 10 minutes
 done
 ```

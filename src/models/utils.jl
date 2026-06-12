@@ -121,9 +121,78 @@ function start_vals(m, pools, keylist)
     x = m[:x]
     set_start_value.(x, 0)  # exclude everyone
     for (i, pool) in enumerate(pools)
+        i > size(x, 1) && break
         for person in pool
-            j = findall(x->x==2, keylist)[1]  # find index of person with id `person`
-            set_start_value(x[i,j], start_value(x[i,j])+1)
+            j = findfirst(==(person), keylist)  # find index of person with id `person`
+            isnothing(j) && error("Person $(person) is not in keylist.")
+            set_start_value(x[i,j], start_value(x[i,j]) + 1)
+        end
+    end
+end
+
+"Index of the PWL segment (per breakpoints `c`) containing `l`."
+function exp_segment(l, c)
+    for k in 1:(length(c)-1)
+        if c[k] - 1e-9 <= l <= c[k+1] + 1e-9
+            return k
+        end
+    end
+    return l < c[1] ? 1 : length(c)-1
+end
+
+"""
+Set a fuller clustered MIP start from pools of person ids.
+
+In addition to `x`, this fills the deterministic variables implied by each
+started pool: `z`, `zind`, `y`, `l`, `lind`, `v`, and a feasible `w`.
+"""
+function full_clustered_start_vals(m, pools, pop, keylist, q, u; G=5, K=15)
+    x = m[:x]
+    z = m[:z]
+    y = m[:y]
+    l = m[:l]
+    w = m[:w]
+    zind = m[:zind]
+    lind = m[:lind]
+    v = m[:v]
+
+    A, B = exp_domain(q, u, G)
+    a, b, c, _ = upper_bounds(A, B, K)
+
+    for (t, pool) in enumerate(pools)
+        t > size(x, 1) && break
+        counts = zeros(Int, length(keylist))
+        log_health = 0.0
+        utility_sum = 0
+
+        for person in pool
+            cluster_key = pop[person]
+            j = findfirst(==(cluster_key), keylist)
+            isnothing(j) && error("Cluster $(cluster_key) for person $(person) is not in keylist.")
+            counts[j] += 1
+            log_health += log(cluster_key[1])
+            utility_sum += cluster_key[2]
+        end
+
+        for j in eachindex(keylist)
+            set_start_value(x[t,j], counts[j])
+        end
+
+        yval = log(utility_sum)
+        lval = yval + log_health
+        active_segment = exp_segment(lval, c)
+        set_start_value(z[t], utility_sum)
+        set_start_value(y[t], yval)
+        set_start_value(l[t], lval)
+        set_start_value(w[t], a[active_segment] * lval + b[active_segment])
+
+        for k in axes(zind, 2)
+            set_start_value(zind[t,k], k == utility_sum ? 1 : 0)
+        end
+
+        for k in 1:K
+            set_start_value(lind[t,k], k == active_segment ? 1 : 0)
+            set_start_value(v[t,k], k == active_segment ? lval : 0)
         end
     end
 end

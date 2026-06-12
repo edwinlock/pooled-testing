@@ -47,4 +47,22 @@
         @test g(2, 20) < g(2, 10)          # tighter approximation with more segments
     end
 
+    @testset "accuracy_params splits a total additive error budget" begin
+        q, u = [0.9, 0.8, 0.7], [10, 5, 8]
+        T, G, target, split = 2, 5, 0.25, 0.7
+        K, gapabs = accuracy_params(q, u; T=T, G=G, target=target, split=split)
+        formulation_error = milp_guarantee(q, u; T=T, G=G, K=K)
+
+        @test K ≥ 1
+        @test formulation_error ≤ split * target + 1e-9
+        @test gapabs ≈ target - formulation_error atol=1e-9
+        @test formulation_error + gapabs ≈ target atol=1e-9
+
+        K2, gapabs2 = accuracy_params(q, u; T=T, G=G, target=target / 2, split=split)
+        @test K2 ≥ K
+        @test gapabs2 ≥ 0
+        @test_throws AssertionError accuracy_params(q, u; T=T, G=G, target=0.0)
+        @test_throws AssertionError accuracy_params(q, u; T=T, G=G, target=target, split=1.0)
+    end
+
 end

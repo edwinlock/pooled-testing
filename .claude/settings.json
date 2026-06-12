@@ -119,7 +119,22 @@
       "Bash(julia --project=. -e 'using PooledTesting; println\\(\"OK: run_experiments=\", isdefined\\(PooledTesting,:run_experiments\\)\\)')",
       "Bash(julia --project=. -e 'using Pkg; Pkg.test\\(\\)')",
       "Bash(julia --project=. -e 'include\\(\"experiments/run.jl\"\\); println\\(\"run.jl loads, EXPERIMENT_SPECS has \", length\\(EXPERIMENT_SPECS\\), \" experiments\"\\)')",
-      "Bash(julia --project=. -e 'include\\(\"experiments/analyse.jl\"\\); println\\(\"analyse.jl loads, ANALYSES has \", length\\(ANALYSES\\)\\)')"
+      "Bash(julia --project=. -e 'include\\(\"experiments/analyse.jl\"\\); println\\(\"analyse.jl loads, ANALYSES has \", length\\(ANALYSES\\)\\)')",
+      "Bash(pkill -f \"experiments/run.jl\")",
+      "Bash(pkill -f \"experiments/analyse.jl\")",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.add\\(\"PrecompileTools\"\\)')",
+      "Bash(time julia --project=. -e 'using PooledTesting; pop=Population{Int}\\(1=>\\(0.9,5\\),2=>\\(0.8,3\\)\\); approximate\\(pop;T=1,G=2,K=5\\); println\\(\"first solve done\"\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; p=Population{Int}\\(1=>\\(0.9,5\\),2=>\\(0.85,4\\),3=>\\(0.8,3\\)\\); approximate\\(p;T=2,G=2,K=5\\); greedy\\(p;T=2,G=2\\); println\\(\"PROBE OK\"\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; println\\(\"GRB_ENVS at load: \", length\\(PooledTesting.GRB_ENVS\\), \" entries \\(should be 0 — envs must be created fresh per session\\)\"\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; println\\(\"GRB_ENVS at load: \", length\\(PooledTesting.GRB_ENVS\\)\\); p=Population{Int}\\(1=>\\(0.9,10\\),2=>\\(0.85,8\\),3=>\\(0.8,6\\),4=>\\(0.7,5\\),5=>\\(0.6,4\\)\\); w,_,_=approximate\\(p;T=2,G=3,K=15\\); println\\(\"solve OK w=\",round\\(w;digits=2\\)\\)')",
+      "Bash(julia --project=. -e 'using PooledTesting; p=Population{Int}\\(1=>\\(0.9,5\\),2=>\\(0.8,3\\)\\); approximate\\(p;T=1,G=2,K=5\\); greedy\\(p;T=1,G=2\\); println\\(\"T=1 G=2 probe: OK\"\\)')",
+      "Bash(git commit -q -m 'Precompile workload + fix stale Gurobi env; POOLED_CONSTANTS test config *)",
+      "Bash(julia --project=. experiments/benchmark_approx.jl --budgets 18 --variants approx,warm_start,log_tangents,warm_start_log_tangents,warm_start_log_tangents_reachable)",
+      "Bash(julia --project=. -e 'using PooledTesting; println\\(\"loads OK\"\\)')",
+      "Bash(julia --project=. -e 'include\\(\"experiments/benchmark_approx.jl\"\\); println\\(\"syntax OK; MILP_ACCURACY=\", MILP_ACCURACY\\)')",
+      "Bash(git -C /Users/k2585143/github/pooled-testing diff src/algorithms.jl src/models/utils.jl)",
+      "Bash(julia --project=. experiments/analyse.jl --experiments 1)",
+      "Bash(sqlite3 /Users/k2585143/github/pooled-testing/experiments/data/solves.db \"SELECT alg, params, COUNT\\(*\\), MIN\\(budget\\), MAX\\(budget\\) FROM solves s JOIN populations p ON s.pop_hash=p.pop_hash WHERE p.experiment=1 GROUP BY alg, params;\")"
     ],
     "additionalDirectories": [
       "/Users/k2585143/github/PooledTesting.jl/src",

@@ -7,7 +7,7 @@
 #
 # Output: data/expN-data.csv, tables/expN-summary.tex, figs/expN-*.pdf
 
-using PooledTesting, CSV, DataFrames, Statistics, StatsPlots, PrettyTables, ArgParse
+using PooledTesting, CSV, DataFrames, Statistics, StatsPlots, PrettyTables, ArgParse, Printf
 
 const ROOT = @__DIR__   # the data/ store and outputs live alongside this script
 
@@ -16,6 +16,25 @@ include(abspath(get(ENV, "POOLED_CONSTANTS", joinpath(@__DIR__, "constants.jl"))
 
 
 ## RESHAPING THE STORE
+
+function select_params(df, algs)
+    selected = Dict{String,String}()
+    for alg in algs
+        rows = filter(:alg => ==(alg), df)
+        isempty(rows) && continue
+        sort!(rows, :timestamp)
+        selected[alg] = rows.params[end]
+        if length(unique(rows.params)) > 1
+            @info "Multiple parameter regimes for $(alg); using latest." params=selected[alg]
+        end
+    end
+    return selected
+end
+
+function filter_params(df, selected)
+    isempty(selected) && return df
+    return filter(row -> haskey(selected, row.alg) && row.params == selected[row.alg], df)
+end
 
 """
 Long-format solves for one experiment, pivoted to one row per (population, budget)
@@ -27,11 +46,18 @@ function experiment_frame(rootdir, experiment; algorder=nothing)
     df = filter(:experiment => ==(experiment), load_solves(rootdir))
     isempty(df) && return df
     algs = algorder === nothing ? sort(unique(df.alg)) : algorder
-    keys = [:pop_index, :budget, :poolsize]
-    wide  = unstack(df, keys, :alg, :welfare;   renamecols=a->Symbol("$(a)_welfare"))
-    times = unstack(df, keys, :alg, :time_ms;   renamecols=a->Symbol("$(a)_time"))
-    guars = unstack(df, keys, :alg, :guarantee; renamecols=a->Symbol("$(a)_guarantee"))
-    wide = innerjoin(wide, times, guars, on=keys)
+    params = select_params(df, algs)
+    df = filter_params(df, params)
+    isempty(df) && return df
+    keys = :n in propertynames(df) ? [:pop_index, :budget, :poolsize, :n] : [:pop_index, :budget, :poolsize]
+    wide  = unstack(df, keys, :alg, :welfare;        renamecols=a->Symbol("$(a)_welfare"))
+    times = unstack(df, keys, :alg, :time_ms;        renamecols=a->Symbol("$(a)_time"))
+    guars = unstack(df, keys, :alg, :guarantee;      renamecols=a->Symbol("$(a)_guarantee"))
+    posts = unstack(df, keys, :alg, :guarantee_post; renamecols=a->Symbol("$(a)_guarantee_post"))
+    wide = innerjoin(wide, times, guars, posts, on=keys)
+    for alg in algs
+        haskey(params, alg) && (wide[!, Symbol("$(alg)_params")] = fill(params[alg], nrow(wide)))
+    end
     a, b = algs[1], algs[2]
     wide.diff  = wide[!, Symbol("$(a)_welfare")] .- wide[!, Symbol("$(b)_welfare")]
     wide.ratio = wide[!, Symbol("$(a)_welfare")] ./ wide[!, Symbol("$(b)_welfare")]
@@ -41,24 +67,106 @@ end
 
 ## SUMMARY TABLES
 
-"Mean over populations of welfare, guarantee and (rounded) time per budget."
+# Mean ignoring missing cells (a live run hasn't filled every solve yet);
+# `missing` when a whole group is missing.
+meanskip(c) = (v = collect(skipmissing(c)); isempty(v) ? missing : mean(v))
+intskip(c) = (v = meanskip(c); v === missing ? missing : round(Int, v))
+
+"Mean over populations of welfare, guarantees and (rounded) time per budget."
 function summary_table(wide, algs)
     cols = Any[]
     for a in algs
-        push!(cols, Symbol("$(a)_welfare") => mean => "$(a) welfare")
-        gcol = Symbol("$(a)_guarantee")
-        gcol in propertynames(wide) && push!(cols, gcol => mean => "$(a) guarantee")
-        push!(cols, Symbol("$(a)_time") => (t -> round(Int, mean(t))) => "$(a) time (ms)")
+        push!(cols, Symbol("$(a)_welfare") => meanskip => "$(a) welfare")
+        for (suffix, label) in (("guarantee", "guarantee"), ("guarantee_post", "post-hoc"))
+            gcol = Symbol("$(a)_$(suffix)")
+            if gcol in propertynames(wide) && a != "greedy"
+                push!(cols, gcol => meanskip => "$(a) $(label)")
+            end
+        end
+        push!(cols, Symbol("$(a)_time") => intskip => "$(a) time (ms)")
     end
+    :diff in propertynames(wide) && push!(cols, :diff => meanskip => "welfare diff")
+    :ratio in propertynames(wide) && push!(cols, :ratio => meanskip => "welfare ratio")
     return combine(groupby(wide, :budget), cols...)
+end
+
+comma_int(x) = replace(string(round(Int, x)), r"(?<=[0-9])(?=(?:[0-9]{3})+(?![0-9]))" => ",")
+fmt2(x) = x === missing ? "--" : comma_int(floor(Int, x)) * @sprintf("%.2f", x - floor(x))[2:end]
+fmt6(x) = x === missing ? "--" : @sprintf("%.6f", x)
+
+function trim_decimal(s)
+    s = replace(s, r"0+$" => "")
+    return replace(s, r"\.$" => "")
+end
+
+function human_time_ms(x)
+    x === missing && return "--"
+    x < 1_000 && return "$(comma_int(x)) ms"
+    x < 60_000 && return "$(trim_decimal(@sprintf("%.2f", x / 1_000))) s"
+    x < 3_600_000 && return "$(trim_decimal(@sprintf("%.2f", x / 60_000))) min"
+    return "$(trim_decimal(@sprintf("%.2f", x / 3_600_000))) h"
+end
+
+function paper_exp1_table(wide)
+    table = combine(groupby(wide, :budget),
+        :approx_welfare => meanskip => :approx_welfare,
+        :approx_guarantee => meanskip => :approx_guarantee,
+        :approx_guarantee_post => meanskip => :approx_guarantee_post,
+        :approx_time => meanskip => :approx_time,
+        :greedy_welfare => meanskip => :greedy_welfare,
+        :greedy_time => meanskip => :greedy_time)
+    # Upper bound on optimal/greedy welfare, from the tighter (post-hoc) certificate.
+    table.apx_to_optimal = (table.approx_welfare .+ table.approx_guarantee_post) ./ table.greedy_welfare
+    return sort!(table, :budget)
+end
+
+function write_paper_exp1_tex(path, wide)
+    table = paper_exp1_table(wide)
+    G = first(skipmissing(wide.poolsize))
+    n = :n in propertynames(wide) ? first(skipmissing(wide.n)) : 130
+    budgets = join(table.budget, ", ")
+    open(path, "w") do io
+        println(io, raw"\begin{table}[tb!]")
+        println(io, raw"    \centering")
+        println(io, raw"    \begin{threeparttable}")
+        println(io, "    \\caption{Performance of the MILP and \\greedy{} on pilot data (\$G=$(G)\$).}")
+        println(io, raw"    \label{table:experiment1}")
+        println(io, raw"    {\small")
+        println(io, raw"    \renewcommand{\arraystretch}{1.15}")
+        println(io, raw"    \begin{tabular}{@{} crccrrcr @{}}")
+        println(io, raw"        \toprule")
+        println(io, "        & \\multicolumn{4}{c}{{MILP}} & \\multicolumn{3}{c}{{Greedy}} \\\\")
+        println(io, raw"        \cmidrule(lr){2-5}")
+        println(io, raw"        \cmidrule(l){6-8}")
+        println(io, "        {Budget} & Welfare & Guarantee & Post-hoc & Time & Welfare & Apx To Optimal & Time\\\\")
+        println(io, raw"        \midrule")
+        for row in eachrow(table)
+            println(io, "        $(row.budget) & $(fmt2(row.approx_welfare)) & $(fmt2(row.approx_guarantee)) & $(fmt2(row.approx_guarantee_post)) & $(human_time_ms(row.approx_time)) & $(fmt2(row.greedy_welfare)) & $(fmt6(row.apx_to_optimal)) & $(human_time_ms(row.greedy_time)) \\\\")
+        end
+        println(io, raw"        \bottomrule")
+        println(io, raw"    \end{tabular}")
+        println(io, raw"    }")
+        println(io, raw"    \begin{tablenotes}[flushleft]")
+        println(io, raw"    \footnotesize")
+        println(io, "    \\item[] \\emph{Note.} Summary showing welfare and computation time for the MILP and \\greedy{} on the pilot data with a population of \$n=$(n)\$ and pool size constraint \$G=$(G)\$, with testing budgets \$B \\in \\{$(budgets)\\}\$. Welfare figures are deterministic values computed on the pilot population. The column ``Guarantee'' reports the a-priori additive approximation guarantee of the MILP relative to optimal non-overlapping welfare; ``Post-hoc'' reports the certified per-instance bound computed after the solve as the solver's dual bound minus the exact MILP welfare, which is at most the guarantee. The column ``Apx To Optimal'' reports the upper bound on the ratio between optimal non-overlapping welfare and \\greedy{} welfare, computed as the MILP welfare plus the post-hoc bound, divided by \\greedy{} welfare.")
+        println(io, raw"    \end{tablenotes}")
+        println(io, raw"    \end{threeparttable}")
+        println(io, raw"\end{table}")
+    end
+    return table
 end
 
 "Write a summary table to data/ (CSV) and tables/ (LaTeX), and print it."
 function write_summary(rootdir, num, wide, algs)
     table = summary_table(wide, algs)
     CSV.write(joinpath(rootdir, "data", "exp$(num)-data.csv"), wide)
-    open(joinpath(rootdir, "tables", "exp$(num)-summary.tex"), "w") do io
-        show(io, "text/latex", table)
+    tex_path = joinpath(rootdir, "tables", "exp$(num)-summary.tex")
+    if string(num) == "1" && algs == ["approx", "greedy"]
+        write_paper_exp1_tex(tex_path, wide)
+    else
+        open(tex_path, "w") do io
+            show(io, "text/latex", table)
+        end
     end
     println("\nExperiment $(num):"); pretty_table(table)
     return table

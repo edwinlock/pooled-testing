@@ -16,10 +16,24 @@ include(abspath(get(ENV, "POOLED_CONSTANTS", joinpath(@__DIR__, "constants.jl"))
 
 const ROOT = @__DIR__   # pilotdata.csv and the data/ store live alongside this script
 
-# The standard approx-vs-greedy algorithm pair.
-const APPROX_VS_GREEDY = [
-    (name=:approx, fn=approximate, args=Dict(:K => MILP_K, :verbose => false)),
-    (name=:greedy, fn=greedy,      args=Dict()),
+"""
+Approximate MILP warm-started from a fresh greedy solution, which also scales
+the relative error budget `accuracy` when given (see `accuracy_params`).
+Greedy takes ~1s against minutes for the MILP, so recomputing it here is
+simpler than plumbing pools from the separate `:greedy` experiment solves.
+"""
+function warm_approximate(pop; T, G, verbose=false, kwargs...)
+    _, start, _ = greedy(pop; T=T, G=G, verbose=verbose)
+    return approximate(pop; T=T, G=G, start=start, verbose=verbose, kwargs...)
+end
+
+# The standard approx-vs-greedy algorithm pair. With an accuracy budget, the
+# MILP derives (K, MIPGapAbs) per instance via accuracy_params; with
+# accuracy=nothing it uses the fixed MILP_K and the global MIPGap.
+approx_vs_greedy(accuracy=nothing) = [
+    (name=:approx, fn=warm_approximate,
+     args=accuracy === nothing ? Dict(:K => MILP_K) : Dict(:accuracy => accuracy)),
+    (name=:greedy, fn=greedy, args=Dict()),
 ]
 
 "Pilot population from the CSV, utilities scaled to integers in [1, UTIL_UPPER_BOUND]."
@@ -46,16 +60,26 @@ function run_experiment(db, num)
     spec = EXPERIMENT_SPECS[num]
     Random.seed!(spec.seed)
     if spec.kind == :pilot
-        run_experiments(db, APPROX_VS_GREEDY, [pilot_population()], PILOT_BUDGETS, [spec.G];
+        run_experiments(db, approx_vs_greedy(spec.accuracy), [pilot_population()], PILOT_BUDGETS, [spec.G];
                         experiment=num, multithread=true)
     elseif spec.kind == :synthetic
-        run_experiments(db, APPROX_VS_GREEDY, synthetic_populations(), SYNTHETIC_BUDGETS, [spec.G];
+        run_experiments(db, approx_vs_greedy(spec.accuracy), synthetic_populations(), SYNTHETIC_BUDGETS, [spec.G];
                         experiment=num, multithread=true)
     elseif spec.kind == :overlap
         algs = [(name=:disjoint, fn=exact, args=Dict(:k => 1)),
                 (name=:two_overlap, fn=exact, args=Dict(:k => 2))]
         pops = [generate_instance(10, 0:0.1:1, 1:3) for _ in 1:SYNTHETIC_REPS]
-        run_experiments(db, algs, pops, [2, 3, 4, 5], [spec.G]; experiment=num, multithread=true)
+        old = (mipgap=PooledTesting.GUROBI_MIPGAP[],
+               threads=PooledTesting.GUROBI_THREADS[],
+               params=copy(PooledTesting.GUROBI_EXTRA_PARAMS[]),
+               param_file=PooledTesting.GUROBI_PARAM_FILE[])
+        configure_gurobi!(mipgap=get(spec, :mipgap, old.mipgap), threads=old.threads,
+                          params=old.params, param_file=old.param_file)
+        try
+            run_experiments(db, algs, pops, [2, 3, 4, 5], [spec.G]; experiment=num, multithread=true)
+        finally
+            configure_gurobi!(; old...)
+        end
     end
 end
 
@@ -63,7 +87,7 @@ end
 function warmup()
     println("\nWARMING UP THE ENGINE")
     pop = generate_instance(10, 0:0.1:1, 1:10)
-    greedy(pop; T=2, G=5); approximate(pop; T=2, G=5, K=MILP_K)
+    warm_approximate(pop; T=2, G=5, K=MILP_K)  # covers greedy + warm-started MILP
     println("READY TO RUMBLE\n")
 end
 
@@ -98,12 +122,8 @@ function main(args)
             continue
         end
         println("\nSTARTING EXPERIMENT $(num)")
-        try
-            run_experiment(db, num)
-            @info "Completed experiment $(num)"
-        catch e
-            @error "Failed to run experiment $(num)" exception=(e, catch_backtrace())
-        end
+        run_experiment(db, num)
+        @info "Completed experiment $(num)"
     end
     @info "All requested experiments done. Analyse with: julia --project=. analyse.jl"
 end

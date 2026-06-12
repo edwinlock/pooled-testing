@@ -3,6 +3,7 @@
 
 using Test, PooledTesting, DataFrames
 using PooledTesting: Δ, partition, upper_bounds, exp_domain, milp_guarantee,
+    accuracy_params,
     remove_zeros!, pop2vec, pop2clusters, cluster2vec, uncluster,
     GUROBI_MIPGAP, NON_SOLVE_ARGS, conic
 

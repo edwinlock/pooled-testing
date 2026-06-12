@@ -21,16 +21,32 @@ using ProgressMeter, PrecompileTools
 # MILP branch-and-bound parallelises poorly past a few.
 const GUROBI_MIPGAP  = Ref(1e-4)
 const GUROBI_THREADS = Ref(8)
+const GUROBI_PARAM_FILE = Ref{Union{Nothing,String}}(nothing)
+const GUROBI_EXTRA_PARAMS = Ref(Dict{String,Any}())
 
-"Set the Gurobi MIPGap and/or thread count used by every MILP solve."
-function configure_gurobi!(; mipgap=GUROBI_MIPGAP[], threads=GUROBI_THREADS[])
+"Set the Gurobi parameters used by every MILP solve."
+function configure_gurobi!(; mipgap=GUROBI_MIPGAP[], threads=GUROBI_THREADS[],
+                           params=Dict{String,Any}(), param_file=nothing)
     GUROBI_MIPGAP[] = mipgap
     GUROBI_THREADS[] = threads
+    GUROBI_EXTRA_PARAMS[] = Dict{String,Any}(String(k) => v for (k, v) in params)
+    GUROBI_PARAM_FILE[] = isnothing(param_file) ? nothing : String(param_file)
     return nothing
 end
 
-set_gurobi_params!(m) = set_optimizer_attributes(m,
-    "Threads" => GUROBI_THREADS[], "MIPGap" => GUROBI_MIPGAP[])
+function set_gurobi_params!(m)
+    attrs = Dict{String,Any}("Threads" => GUROBI_THREADS[], "MIPGap" => GUROBI_MIPGAP[])
+    merge!(attrs, GUROBI_EXTRA_PARAMS[])
+    set_optimizer_attributes(m, attrs...)
+    file = GUROBI_PARAM_FILE[]
+    if file !== nothing
+        MOI.Utilities.attach_optimizer(JuMP.backend(m))
+        raw = JuMP.unsafe_backend(m)
+        ret = Gurobi.GRBreadparams(Gurobi.GRBgetenv(raw), file)
+        ret != 0 && error("Could not read Gurobi parameter file: $(file)")
+    end
+    return nothing
+end
 
 # One Gurobi environment per thread (not safe to share across concurrent solves),
 # created lazily. A Dict avoids assuming the thread count at precompile time.
@@ -62,10 +78,10 @@ include("runner.jl")
 export Population, configure_gurobi!
 export greedy, exact, approximate, conic           # algorithms
 export welfare, generate_instance, scale_utilities # population utilities
-export milp_guarantee                              # approximation guarantee
+export milp_guarantee, accuracy_params             # approximation guarantee/budget
 export open_store, record_population!, record_solve!, solved_keys, load_solves,
        population_hash, param_key, store_path       # solve store
-export run_experiments, store_solve!, main_thread_only  # runner
+export run_experiments, store_solve!               # runner
 
 # ---- Precompilation ---------------------------------------------------------
 # Bake the solve + store pipeline into the precompile cache so the first call in
@@ -76,8 +92,8 @@ export run_experiments, store_solve!, main_thread_only  # runner
     @compile_workload begin
         milp_guarantee([0.9, 0.8], [5, 3]; T=2, G=2, K=5)
         db = open_store(mktempdir())
-        h = record_population!(db, pop; experiment=1, pop_index=1)
-        record_solve!(db, h, 2, 2, (name=:approx, fn=approximate, args=Dict(:K=>5)), 1.0, 0.1, 10)
+        h = record_population!(db, pop)
+        record_solve!(db, 1, 1, h, 2, 2, (name=:approx, fn=approximate, args=Dict(:K=>5)), 1.0, 0.1, 0.05, 10)
         solved_keys(db); load_solves(db)
         try
             approximate(pop; T=1, G=2, K=5)   # Gurobi
