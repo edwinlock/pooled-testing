@@ -16,26 +16,44 @@ Create a Scaleway instance with:
 - Disk: at least 30 GB
 - SSH: your public key installed
 
-Scaleway images often allow SSH as `root`. If your image uses a different user,
-replace `root` below.
+The Ubuntu images use the `ubuntu` user. If your image uses a different user,
+replace `ubuntu` below.
 
 ```sh
-ssh root@<server-ip>
+ssh ubuntu@<server-ip>
 ```
 
 Copy the Gurobi and MOSEK licences from your local machine:
 
 ```sh
-scp ~/gurobi.lic ~/mosek.lic root@<server-ip>:~/
+scp ~/gurobi.lic ~/mosek.lic ubuntu@<server-ip>:~/
 ```
+
+### Record the server specs
+
+Solve timings are hardware-dependent, so record what machine produced them.
+Save a spec sheet on the server (it travels back with the results):
+
+```sh
+{ echo "=== HOST ==="; hostnamectl; \
+  echo "=== CPU ===";  lscpu; \
+  echo "=== MEM ===";  free -h; \
+  echo "=== DISK ==="; df -h; lsblk; \
+  echo "=== OS ===";   cat /etc/os-release; \
+  echo "=== KERNEL ==="; uname -a; } > ~/pooled-testing/server-specs.txt 2>&1
+```
+
+`lscpu` reports the **physical core count**, which sets the Julia thread count in
+section 6 (`cores / 8`). If `inxi` is available (`sudo apt-get install -y inxi`),
+`inxi -Fxz` gives a tidier one-shot summary.
 
 ## 2. Install System Packages
 
 On the server:
 
 ```sh
-apt-get update
-apt-get install -y \
+sudo apt-get update
+sudo apt-get install -y \
   bzip2 \
   ca-certificates \
   curl \
@@ -123,54 +141,9 @@ Confirm that Julia sees Gurobi 13:
 julia --project=. -e 'using Gurobi; println(Gurobi.GRB_VERSION_MAJOR, ".", Gurobi.GRB_VERSION_MINOR, ".", Gurobi.GRB_VERSION_TECHNICAL)'
 ```
 
-## 5. Tune One Shared Gurobi Profile
+## 5. Run Experiments
 
-Because this server is AMD EPYC, tune on the server rather than relying on a
-profile produced on an Apple laptop or ARM instance. The command below creates
-one shared `.prm` profile for `B=18`, `B=22` and `B=30`, with an eight-hour total
-tuning cap and 45 minutes per trial/model.
-
-```sh
-tmux new -s gurobi-tune
-cd ~/pooled-testing
-julia --project=. experiments/tune_gurobi.jl \
-  --budgets 18,22,30 \
-  --multi-model \
-  --time-limit 2700 \
-  --tune-time-limit 28800 \
-  --baseline-runs 1 \
-  --validate-runs 2
-```
-
-Artifacts go to `experiments/gurobi-tuning/`. At the end, the script prints the
-baseline mean runtime, tuned validation mean runtime, seconds saved, percentage
-saved and speedup for each budget.
-
-Detach from tmux with `Ctrl-b` then `d`. Reattach with:
-
-```sh
-tmux attach -t gurobi-tune
-```
-
-To validate an existing shared `.prm` without re-tuning:
-
-```sh
-julia --project=. experiments/tune_gurobi.jl \
-  --budgets 18,22,30 \
-  --multi-model \
-  --time-limit 2700 \
-  --baseline-runs 1 \
-  --skip-tune \
-  --validate-runs 2
-```
-
-The tuning script uses the `.prm` only for validation. The main experiment run
-still uses paper-default Gurobi settings unless you explicitly wire a tuned
-`param_file` into the experiment code.
-
-## 6. Run Experiments
-
-Use a separate tmux session:
+Use a separate tmux session so the run survives disconnects:
 
 ```sh
 tmux new -s experiments
@@ -184,48 +157,114 @@ independent solves across Julia threads. Choose Julia threads as roughly:
 Julia threads = physical cores / 8
 ```
 
-For example, if the server has 64 vCPUs and 32 physical cores, start with
-`-t 4`; if it has 96 vCPUs and 48 physical cores, start with `-t 6`. Avoid
-`-t auto`, which will oversubscribe badly.
+Use the physical core count from `lscpu` (section 1's `server-specs.txt`). For
+example, a 24-core EPYC → `-t 3`; 48 physical cores → `-t 6`. Avoid `-t auto`,
+which spawns one Julia thread per core and, with 8 Gurobi threads each, badly
+oversubscribes.
 
 First run one multithreaded experiment as a sanity check:
 
 ```sh
-julia --project=. -t 4 experiments/run.jl --experiments 3
+julia --project=. -t 3 experiments/run.jl --experiments 3
 ```
 
 Then run all experiments, or a subset:
 
 ```sh
-julia --project=. -t 4 experiments/run.jl
+julia --project=. -t 3 experiments/run.jl
 
 # Or selected experiments
-julia --project=. -t 4 experiments/run.jl --experiments 1,3,5
+julia --project=. -t 3 experiments/run.jl --experiments 1,3,5
 ```
 
-Analyse results:
+Solves already in the store are skipped, so an interrupted or reclaimed run
+simply resumes — re-run the same command. Experiment parameters (budgets, pool
+sizes, per-experiment `accuracy`) live in `experiments/constants.jl`.
+
+### Re-solving and overwriting (`--algs`, `--overwrite`)
+
+By default a run only fills in missing cells. Two flags let you redo work:
+
+- `--algs a,b` restricts the run to named algorithms (e.g. `greedy`).
+- `--overwrite` re-solves cells already in the store and overwrites them in
+  place (otherwise they are skipped).
+
+These matter for **clean timings**. Wall-clock time is recorded per solve, so a
+fast algorithm timed while heavy MILP solves saturate the CPU looks far slower
+than it is. To re-time greedy alone, with no contention, run it single-threaded
+after the MILP work is done:
+
+```sh
+julia --project=. -t 1 experiments/run.jl --algs greedy --overwrite
+```
+
+Populations are generated deterministically from each experiment's seed *before*
+any algorithm runs, and greedy is deterministic, so a greedy re-run reproduces
+the exact same populations and welfares — only the recorded time changes.
+
+## 6. Analyse Results
+
+Analysis is separate from solving: `analyse.jl` only reads the store, so it is
+safe to run while `run.jl` is still solving.
 
 ```sh
 julia --project=. experiments/analyse.jl
+
+# A subset
+julia --project=. experiments/analyse.jl --experiments 3,4
 ```
+
+It writes, per experiment, `experiments/data/expN-data.csv`,
+`experiments/tables/expN-summary.tex` (paper-ready booktabs tables) and
+`experiments/figs/expN-*.pdf`. A few things to know so the output is correct:
+
+- **Budgets are filtered by `constants.jl`.** Each experiment is analysed only
+  over the budgets in its spec; surplus budgets left in the store from earlier
+  runs are ignored (not deleted). Keep `constants.jl` matching the data you want.
+- **Latest parameter regime wins.** If the store holds solves at more than one
+  `accuracy`/`K`, analysis uses the most recent regime per algorithm and reports
+  it; mixing regimes in one table is avoided by design.
+- **Incomplete cells show as `--`.** A budget whose MILP solve has not finished
+  yet appears blank rather than breaking the table.
+
+### Running analysis against a copied data directory
+
+If you have copied only the results to your laptop (data-only, without running
+the server's code), run the repo's `analyse.jl` and point `--rootdir` at the
+copied `experiments` directory holding `data/solves.db`:
+
+```sh
+julia --project=. experiments/analyse.jl --rootdir /path/to/copied/experiments
+```
+
+`run.jl` accepts the same `--rootdir` if you ever re-solve against a copied store.
 
 ## 7. Back Up Results To Your Laptop
 
 There is no bucket or persistent object storage in this workflow. The important
 outputs are:
 
-- `experiments/data/`
+- `experiments/data/`  (includes `solves.db` — the SQLite store; portable across
+  OS/architecture)
 - `experiments/tables/`
 - `experiments/figs/`
-- `experiments/gurobi-tuning/`
+- `server-specs.txt`   (the spec sheet from section 1)
 
-From your local machine, copy them down periodically:
+The SQLite store is safest to copy when nothing is writing to it. If a run may be
+active, checkpoint the write-ahead log first so the main file is self-contained:
 
 ```sh
-rsync -avz root@<server-ip>:~/pooled-testing/experiments/data ./experiments/
-rsync -avz root@<server-ip>:~/pooled-testing/experiments/tables ./experiments/
-rsync -avz root@<server-ip>:~/pooled-testing/experiments/figs ./experiments/
-rsync -avz root@<server-ip>:~/pooled-testing/experiments/gurobi-tuning ./experiments/
+sqlite3 ~/pooled-testing/experiments/data/solves.db "PRAGMA wal_checkpoint(TRUNCATE);"
+```
+
+From your local machine, copy results down periodically (re-runnable; only
+transfers what changed):
+
+```sh
+rsync -avz ubuntu@<server-ip>:~/pooled-testing/experiments/data ./experiments/
+rsync -avz ubuntu@<server-ip>:~/pooled-testing/experiments/tables ./experiments/
+rsync -avz ubuntu@<server-ip>:~/pooled-testing/experiments/figs ./experiments/
+rsync -avz ubuntu@<server-ip>:~/pooled-testing/server-specs.txt .
 ```
 
 Or create one compressed archive on the server:
@@ -236,13 +275,13 @@ tar czf pooled-testing-results.tgz \
   experiments/data \
   experiments/tables \
   experiments/figs \
-  experiments/gurobi-tuning
+  server-specs.txt
 ```
 
 Then download it locally:
 
 ```sh
-scp root@<server-ip>:~/pooled-testing/pooled-testing-results.tgz .
+scp ubuntu@<server-ip>:~/pooled-testing/pooled-testing-results.tgz .
 ```
 
 ## 8. Monitor The Server

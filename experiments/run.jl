@@ -55,16 +55,24 @@ function synthetic_populations()
     return [generate_instance(SYNTHETIC_N, Uniform(0.5, 1), udist) for _ in 1:SYNTHETIC_REPS]
 end
 
-"Run experiment `num` (per EXPERIMENT_SPECS) into the store `db`."
-function run_experiment(db, num)
+# Keep only algorithms whose name is in `keep` (a set of strings); `nothing`
+# keeps all. Lets a run re-solve just one algorithm, e.g. greedy-only re-timing.
+filter_algs(algs, keep) = keep === nothing ? algs : filter(a -> String(a.name) in keep, algs)
+
+"""
+Run experiment `num` (per EXPERIMENT_SPECS) into the store `db`. `algs_keep`,
+when given (a set of algorithm-name strings), restricts the run to those
+algorithms — e.g. `Set([\"greedy\"])` to re-solve only greedy.
+"""
+function run_experiment(db, num; algs_keep=nothing, force=false)
     spec = EXPERIMENT_SPECS[num]
     Random.seed!(spec.seed)
     if spec.kind == :pilot
-        run_experiments(db, approx_vs_greedy(spec.accuracy), [pilot_population()], PILOT_BUDGETS, [spec.G];
-                        experiment=num, multithread=true)
+        run_experiments(db, filter_algs(approx_vs_greedy(spec.accuracy), algs_keep), [pilot_population()], PILOT_BUDGETS, [spec.G];
+                        experiment=num, multithread=true, force=force)
     elseif spec.kind == :synthetic
-        run_experiments(db, approx_vs_greedy(spec.accuracy), synthetic_populations(), SYNTHETIC_BUDGETS, [spec.G];
-                        experiment=num, multithread=true)
+        run_experiments(db, filter_algs(approx_vs_greedy(spec.accuracy), algs_keep), synthetic_populations(), SYNTHETIC_BUDGETS, [spec.G];
+                        experiment=num, multithread=true, force=force)
     elseif spec.kind == :overlap
         algs = [(name=:disjoint, fn=exact, args=Dict(:k => 1)),
                 (name=:two_overlap, fn=exact, args=Dict(:k => 2))]
@@ -76,7 +84,7 @@ function run_experiment(db, num)
         configure_gurobi!(mipgap=get(spec, :mipgap, old.mipgap), threads=old.threads,
                           params=old.params, param_file=old.param_file)
         try
-            run_experiments(db, algs, pops, [2, 3, 4, 5], [spec.G]; experiment=num, multithread=true)
+            run_experiments(db, filter_algs(algs, algs_keep), pops, [2, 3, 4, 5], [spec.G]; experiment=num, multithread=true, force=force)
         finally
             configure_gurobi!(; old...)
         end
@@ -103,6 +111,13 @@ function parse_commandline(args)
             help = "Comma-separated experiments to run. Available: $(join(EXPERIMENT_NUMBERS, ", ")). Default: all."
             arg_type = String
             default = join(EXPERIMENT_NUMBERS, ",")
+        "--algs"
+            help = "Comma-separated algorithm names to run (e.g. greedy). Default: all in the experiment. Useful for re-solving one algorithm, e.g. greedy-only re-timing."
+            arg_type = String
+            default = ""
+        "--overwrite"
+            help = "Re-solve cells already in the store and overwrite them (default: skip existing). Combine with --algs to re-solve one algorithm, e.g. greedy re-timing."
+            action = :store_true
         "--rootdir"
             help = "Directory for the solve store (default: this experiments directory)."
             arg_type = String
@@ -114,6 +129,11 @@ end
 function main(args)
     parsed = parse_commandline(args)
     db = open_store(parsed["rootdir"])
+    algs_keep = let a = strip(parsed["algs"])
+        isempty(a) ? nothing : Set(strip.(split(a, [',', ' ']; keepempty=false)))
+    end
+    algs_keep === nothing || @info "Restricting to algorithms: $(join(sort(collect(algs_keep)), ", "))"
+    parsed["overwrite"] && @info "Overwrite mode: existing solves will be re-solved and replaced."
     warmup()
     for s in split(parsed["experiments"], [',', ' ']; keepempty=false)
         num = tryparse(Int, strip(s))
@@ -122,7 +142,7 @@ function main(args)
             continue
         end
         println("\nSTARTING EXPERIMENT $(num)")
-        run_experiment(db, num)
+        run_experiment(db, num; algs_keep=algs_keep, force=parsed["overwrite"])
         @info "Completed experiment $(num)"
     end
     @info "All requested experiments done. Analyse with: julia --project=. analyse.jl"

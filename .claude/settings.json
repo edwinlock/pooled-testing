@@ -134,11 +134,42 @@
       "Bash(julia --project=. -e 'include\\(\"experiments/benchmark_approx.jl\"\\); println\\(\"syntax OK; MILP_ACCURACY=\", MILP_ACCURACY\\)')",
       "Bash(git -C /Users/k2585143/github/pooled-testing diff src/algorithms.jl src/models/utils.jl)",
       "Bash(julia --project=. experiments/analyse.jl --experiments 1)",
-      "Bash(sqlite3 /Users/k2585143/github/pooled-testing/experiments/data/solves.db \"SELECT alg, params, COUNT\\(*\\), MIN\\(budget\\), MAX\\(budget\\) FROM solves s JOIN populations p ON s.pop_hash=p.pop_hash WHERE p.experiment=1 GROUP BY alg, params;\")"
+      "Bash(sqlite3 /Users/k2585143/github/pooled-testing/experiments/data/solves.db \"SELECT alg, params, COUNT\\(*\\), MIN\\(budget\\), MAX\\(budget\\) FROM solves s JOIN populations p ON s.pop_hash=p.pop_hash WHERE p.experiment=1 GROUP BY alg, params;\")",
+      "Read(//Users/k2585143/.ssh/**)",
+      "Bash(ssh -o ConnectTimeout=10 -o BatchMode=yes -v root@62.210.172.252 'echo ok')",
+      "Bash(scw iam *)",
+      "Bash(ssh-keygen -R 62.210.172.252)",
+      "Read(//Users/k2585143/**)",
+      "Bash(julia --project=. -e 'using Pkg; Pkg.instantiate\\(\\)')",
+      "Bash(julia --project=.. analyse.jl)",
+      "Bash(julia --project=.. analyse.jl --experiments 3,4)",
+      "Bash(git checkout *)",
+      "Bash(git commit -m ' *)",
+      "Bash(pdftoppm -png -r 110 tbltest.pdf tbltest)",
+      "Bash(mkdir -p '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/tables')",
+      "Bash(cp /Users/k2585143/scaleway_data/experiments/tables/exp1-summary.tex /Users/k2585143/scaleway_data/experiments/tables/exp2-summary.tex /Users/k2585143/scaleway_data/experiments/tables/exp3-summary.tex /Users/k2585143/scaleway_data/experiments/tables/exp4-summary.tex '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/tables/')",
+      "Bash(cp /Users/k2585143/scaleway_data/experiments/figs/exp3-welfares.pdf /Users/k2585143/scaleway_data/experiments/figs/exp3-ratios.pdf /Users/k2585143/scaleway_data/experiments/figs/exp3-scatter.pdf /Users/k2585143/scaleway_data/experiments/figs/exp3-gainhist.pdf /Users/k2585143/scaleway_data/experiments/figs/exp4-welfares.pdf /Users/k2585143/scaleway_data/experiments/figs/exp4-ratios.pdf /Users/k2585143/scaleway_data/experiments/figs/exp4-scatter.pdf /Users/k2585143/scaleway_data/experiments/figs/exp4-gainhist.pdf '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/figures/simulations/')",
+      "Bash(latexmk -pdf OR-submission.tex)",
+      "Bash(echo \"latexmk exit: $?\")",
+      "Bash(echo \"exit-grep:$?  \\(no lines above = our table labels are fine\\)\")",
+      "Bash(pdflatex -interaction=nonstopmode -halt-on-error -file-line-error -output-directory=.build OR-submission.tex)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(pdftoppm -png -r 70 -f 72 -l 73 \"/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/.build/OR-submission.pdf\" appx)",
+      "Bash(echo \"latexmk exit:$?\")",
+      "Bash(ls -la '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/.build/OR-submission.pdf')",
+      "Bash(pdftoppm -png -r 80 -f 72 -l 73 '/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper/.build/OR-submission.pdf' appx)",
+      "Bash(julia --project=. -e 'include\\(\"experiments/analyse.jl\"\\); println\\(\"analyse.jl loaded OK; functions present: \", all\\(isdefined\\(Main, f\\) for f in [:write_paper_table, :paper_table, :table_descr, :plot_gain_hist, :experiment_frame]\\)\\)')",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git -C /Users/k2585143/github/pooled-testing status --short)",
+      "Bash(git -C /Users/k2585143/scaleway_data status --short)"
     ],
     "additionalDirectories": [
       "/Users/k2585143/github/PooledTesting.jl/src",
-      "/tmp"
+      "/tmp",
+      "/Users/k2585143/scaleway_data/experiments",
+      "/Users/k2585143/Library/CloudStorage/Dropbox/Apps/Overleaf/OR: Welfare-Maximizing Pooled Testing/paper",
+      "/Users/k2585143/scaleway_data/src"
     ]
   }
 }

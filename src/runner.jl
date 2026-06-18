@@ -18,10 +18,12 @@ end
 Solve every (population, budget, poolsize, algorithm) combination not already in
 the store, recording each result. Solves run in parallel when `multithread`.
 """
-function run_experiments(db, algs, populations, budgets, poolsizes; experiment, multithread=false)
+function run_experiments(db, algs, populations, budgets, poolsizes; experiment, multithread=false, force=false)
     hashes = [record_population!(db, pop) for pop in populations]
     done = solved_keys(db)
-    todo(i, h, T, G, alg) = (experiment, i, h, T, G, String(alg.name), param_key(alg)) ∉ done
+    # `force` re-solves cells already in the store; record_solve! is INSERT OR
+    # REPLACE, so the existing row is overwritten in place (e.g. greedy re-timing).
+    todo(i, h, T, G, alg) = force || (experiment, i, h, T, G, String(alg.name), param_key(alg)) ∉ done
 
     work = [(experiment, i, h, pop, T, G, alg)
             for (i, (h, pop)) in enumerate(zip(hashes, populations))
