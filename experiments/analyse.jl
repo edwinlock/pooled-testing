@@ -114,7 +114,12 @@ function human_time_ms(x)
     return "$(trim_decimal(@sprintf("%.2f", x / 3_600_000))) h"
 end
 
-function paper_exp1_table(wide)
+"""
+Per-budget summary in the paper's column layout (mean over populations of
+welfare / guarantees / time), plus the guarantee-inclusive `apx_to_optimal`
+upper bound `(MILP welfare + post-hoc bound) / greedy welfare`.
+"""
+function paper_table(wide)
     table = combine(groupby(wide, :budget),
         :approx_welfare => meanskip => :approx_welfare,
         :approx_guarantee => meanskip => :approx_guarantee,
@@ -122,22 +127,44 @@ function paper_exp1_table(wide)
         :approx_time => meanskip => :approx_time,
         :greedy_welfare => meanskip => :greedy_welfare,
         :greedy_time => meanskip => :greedy_time)
-    # Upper bound on optimal/greedy welfare, from the tighter (post-hoc) certificate.
     table.apx_to_optimal = (table.approx_welfare .+ table.approx_guarantee_post) ./ table.greedy_welfare
     return sort!(table, :budget)
 end
 
-function write_paper_exp1_tex(path, wide)
-    table = paper_exp1_table(wide)
+# Caption/label/note wording per experiment kind. `npops` is the number of
+# populations the means are taken over (1 ⇒ deterministic pilot population).
+function table_descr(num, kind, G, n, npops)
+    if kind == :pilot
+        caption = "Performance of the MILP and \\greedy{} on pilot data (\$G=$(G)\$)."
+        data    = "the pilot data with a population of \$n=$(n)\$"
+        avg     = "Welfare figures are deterministic values computed on the pilot population."
+    else
+        caption = "Synthetic-population performance of the MILP and \\greedy{} (\$G=$(G)\$)."
+        data    = "synthetic data with populations of size \$n=$(n)\$"
+        avg     = "Welfares and times are averaged over $(npops) randomly generated populations."
+    end
+    return (caption=caption, data=data, avg=avg, label="table:experiment$(num)")
+end
+
+"""
+Write one experiment's summary as a self-contained, `\\input`-able paper-style
+table (booktabs + threeparttable, grouped MILP/Greedy headers, the
+`Apx To Optimal` column, caption/label/notes). Used for the approx-vs-greedy
+experiments (1–4); the wording adapts to pilot vs synthetic via `spec`.
+"""
+function write_paper_table(path, num, wide, spec)
+    table = paper_table(wide)
     G = first(skipmissing(wide.poolsize))
-    n = :n in propertynames(wide) ? first(skipmissing(wide.n)) : 130
+    n = :n in propertynames(wide) ? first(skipmissing(wide.n)) : (spec.kind == :pilot ? 130 : SYNTHETIC_N)
+    npops = length(unique(wide.pop_index))
+    d = table_descr(num, spec.kind, G, n, npops)
     budgets = join(table.budget, ", ")
     open(path, "w") do io
         println(io, raw"\begin{table}[tb!]")
         println(io, raw"    \centering")
         println(io, raw"    \begin{threeparttable}")
-        println(io, "    \\caption{Performance of the MILP and \\greedy{} on pilot data (\$G=$(G)\$).}")
-        println(io, raw"    \label{table:experiment1}")
+        println(io, "    \\caption{$(d.caption)}")
+        println(io, "    \\label{$(d.label)}")
         println(io, raw"    {\small")
         println(io, raw"    \renewcommand{\arraystretch}{1.15}")
         println(io, raw"    \begin{tabular}{@{} crccrrcr @{}}")
@@ -155,7 +182,7 @@ function write_paper_exp1_tex(path, wide)
         println(io, raw"    }")
         println(io, raw"    \begin{tablenotes}[flushleft]")
         println(io, raw"    \footnotesize")
-        println(io, "    \\item[] \\emph{Note.} Summary showing welfare and computation time for the MILP and \\greedy{} on the pilot data with a population of \$n=$(n)\$ and pool size constraint \$G=$(G)\$, with testing budgets \$B \\in \\{$(budgets)\\}\$. Welfare figures are deterministic values computed on the pilot population. The column ``Guarantee'' reports the a-priori additive approximation guarantee of the MILP relative to optimal non-overlapping welfare; ``Post-hoc'' reports the certified per-instance bound computed after the solve as the solver's dual bound minus the exact MILP welfare, which is at most the guarantee. The column ``Apx To Optimal'' reports the upper bound on the ratio between optimal non-overlapping welfare and \\greedy{} welfare, computed as the MILP welfare plus the post-hoc bound, divided by \\greedy{} welfare.")
+        println(io, "    \\item[] \\emph{Note.} Summary showing welfare and computation time for the MILP and \\greedy{} on $(d.data) and pool size constraint \$G=$(G)\$, with testing budgets \$B \\in \\{$(budgets)\\}\$. $(d.avg) The column ``Guarantee'' reports the a-priori additive approximation guarantee of the MILP relative to optimal non-overlapping welfare; ``Post-hoc'' reports the certified per-instance bound computed after the solve as the solver's dual bound minus the exact MILP welfare, which is at most the guarantee. The column ``Apx To Optimal'' reports the upper bound on the ratio between optimal non-overlapping welfare and \\greedy{} welfare, computed as the MILP welfare plus the post-hoc bound, divided by \\greedy{} welfare.")
         println(io, raw"    \end{tablenotes}")
         println(io, raw"    \end{threeparttable}")
         println(io, raw"\end{table}")
@@ -168,8 +195,9 @@ function write_summary(rootdir, num, wide, algs)
     table = summary_table(wide, algs)
     CSV.write(joinpath(rootdir, "data", "exp$(num)-data.csv"), wide)
     tex_path = joinpath(rootdir, "tables", "exp$(num)-summary.tex")
-    if string(num) == "1" && algs == ["approx", "greedy"]
-        write_paper_exp1_tex(tex_path, wide)
+    spec = get(EXPERIMENT_SPECS, parse(Int, string(num)), nothing)
+    if algs == ["approx", "greedy"] && spec !== nothing
+        write_paper_table(tex_path, num, wide, spec)
     else
         open(tex_path, "w") do io
             show(io, "text/latex", table)

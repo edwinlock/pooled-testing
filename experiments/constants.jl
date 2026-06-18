@@ -23,7 +23,7 @@ const SYNTHETIC_ACCURACY = 0.002           # 0.2% for the synthetic experiments
 # (exact MILPs, so no accuracy parameter applies).
 const EXPERIMENT_SPECS = Dict(
     1 => (kind=:pilot,     G=5,  seed=1002, accuracy=PILOT_ACCURACY),
-    2 => (kind=:pilot,     G=10, seed=1003, accuracy=0.005),
+    2 => (kind=:pilot,     G=10, seed=1003, accuracy=0.005),  # 0.5% accuracy
     3 => (kind=:synthetic, G=5,  seed=2001, accuracy=SYNTHETIC_ACCURACY),
     4 => (kind=:synthetic, G=10, seed=2002, accuracy=SYNTHETIC_ACCURACY),
     5 => (kind=:overlap,   G=10, seed=3001, mipgap=1e-3),
