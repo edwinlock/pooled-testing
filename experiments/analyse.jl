@@ -42,9 +42,16 @@ with a `<alg>_welfare` / `<alg>_time` column per algorithm — the shape the
 summaries and plots expect. Adds `diff`/`ratio` between the two algorithms (the
 first listed is the numerator).
 """
-function experiment_frame(rootdir, experiment; algorder=nothing)
+function experiment_frame(rootdir, experiment; algorder=nothing, budgets=nothing)
     df = filter(:experiment => ==(experiment), load_solves(rootdir))
     isempty(df) && return df
+    # Restrict to the budgets defined in constants.jl (via the experiment spec).
+    # The store may hold extra budgets from earlier runs; analyse only the
+    # configured ones, leaving the surplus rows in the store untouched.
+    if budgets !== nothing
+        df = filter(:budget => in(Set(budgets)), df)
+        isempty(df) && return df
+    end
     algs = algorder === nothing ? sort(unique(df.alg)) : algorder
     params = select_params(df, algs)
     df = filter_params(df, params)
@@ -203,6 +210,30 @@ function plot_scatter(wide, a, b, filename)
     Plots.pdf(filename)
 end
 
+"""
+Per-budget histograms of the percentage welfare improvement of `a` over `b`
+(`100*(ratio-1)`) across populations: one stacked panel per budget, sharing the
+x-axis, with a dashed line at 0% (the two algorithms tie). Surfaces the full
+spread the welfare violins hide — how many populations gain nothing vs a lot.
+"""
+function plot_gain_hist(wide, a, b, filename; budgets=nothing)
+    bs = budgets === nothing ? sort(unique(wide.budget)) : sort(filter(in(Set(wide.budget)), budgets))
+    gain = 100 .* (collect(skipmissing(wide.ratio)) .- 1)
+    lo, hi = extrema(gain)                        # shared x-range across panels
+    edges = range(lo, hi; length=21)
+    panels = map(enumerate(bs)) do (i, bud)
+        g = 100 .* (collect(skipmissing(filter(:budget => ==(bud), wide).ratio)) .- 1)
+        p = histogram(g; bins=edges, xlims=(lo, hi), legend=false, color=:steelblue,
+            linecolor=:white, ylabel="B=$(bud)", yticks=nothing,
+            xlabel=(i == length(bs) ? "$(a) over $(b) welfare (%)" : ""))
+        vline!(p, [0.0]; line=(:dash, :gray), label="")
+        p
+    end
+    plot(panels...; layout=(length(panels), 1), size=(420, 130*length(panels)),
+        plot_title="Per-population welfare gain", link=:x)
+    Plots.pdf(filename)
+end
+
 
 ## DRIVING THE ANALYSIS PER EXPERIMENT
 
@@ -211,14 +242,14 @@ end
 const ANALYSES = Dict(
     "1" => (algs=["approx","greedy"], plots=false, scatter=false, budgets=PILOT_BUDGETS),
     "2" => (algs=["approx","greedy"], plots=false, scatter=false, budgets=PILOT_BUDGETS),
-    "3" => (algs=["approx","greedy"], plots=true,  scatter=false, budgets=SYNTHETIC_BUDGETS),
-    "4" => (algs=["approx","greedy"], plots=true,  scatter=false, budgets=SYNTHETIC_BUDGETS),
+    "3" => (algs=["approx","greedy"], plots=true,  scatter=true, budgets=SYNTHETIC_BUDGETS),
+    "4" => (algs=["approx","greedy"], plots=true,  scatter=true, budgets=SYNTHETIC_BUDGETS),
     "5" => (algs=["two_overlap","disjoint"], plots=true, scatter=true, budgets=[2,3,4,5]),
 )
 
 function analyse(rootdir, key)
     spec = ANALYSES[key]
-    wide = experiment_frame(rootdir, parse(Int, key); algorder=spec.algs)
+    wide = experiment_frame(rootdir, parse(Int, key); algorder=spec.algs, budgets=spec.budgets)
     if isempty(wide)
         @warn "No solves stored for experiment $(key) yet."
         return
@@ -229,6 +260,7 @@ function analyse(rootdir, key)
     if spec.plots
         plot_welfares(wide, a, b, joinpath(rootdir, "figs", "exp$(key)-welfares.pdf"); budgets=spec.budgets)
         plot_ratios(wide, joinpath(rootdir, "figs", "exp$(key)-ratios.pdf"); budgets=spec.budgets)
+        plot_gain_hist(wide, a, b, joinpath(rootdir, "figs", "exp$(key)-gainhist.pdf"); budgets=spec.budgets)
     end
     spec.scatter && plot_scatter(wide, a, b, joinpath(rootdir, "figs", "exp$(key)-scatter.pdf"))
 end
